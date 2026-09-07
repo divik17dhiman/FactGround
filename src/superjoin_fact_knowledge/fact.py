@@ -93,6 +93,24 @@ QUANTITY_RE = re.compile(
 )
 SUBJECT_BOUNDARY_RE = re.compile(r"\b(?:and|or|but)\b|[;:]", re.IGNORECASE)
 
+# Units that are too generic or frequently noise in document extraction
+INVALID_UNIT_PATTERNS = {
+    "page", "pages", "section", "chapter", "ref", "figure", "table", "note",
+    "of", "to", "from", "for", "and", "or", "by", "in", "on", "at",
+    "a", "an", "the", "as", "is", "are", "be", "been",
+}
+
+# Known valid unit abbreviations and their normalized form
+KNOWN_UNITS = {
+    "m": "m", "mn": "mn", "million": "million", "mil": "million", 
+    "b": "bn", "bn": "bn", "billion": "billion", "bil": "billion",
+    "k": "k", "thousand": "thousand", "th": "thousand",
+    "lakh": "lakh", "cr": "crore", "crore": "crore",
+    "sq": "sq", "sqft": "sq ft", "sq ft": "sq ft", "sq m": "sq m",
+    "mt": "mt", "tonnes": "tonnes", "tons": "tons",
+    "pcs": "pcs", "pieces": "pieces", "units": "units",
+}
+
 
 @dataclass(slots=True)
 class Fact:
@@ -166,6 +184,16 @@ def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _deduplicate_adjacent_words(text: str) -> str:
+    """Remove consecutive repeated words to avoid 'Fiscal Fiscal' or 'March March'."""
+    words = text.split()
+    deduped = []
+    for word in words:
+        if not deduped or word.lower() != deduped[-1].lower():
+            deduped.append(word)
+    return " ".join(deduped)
+
+
 def _words(text: str) -> list[str]:
     """Tokenize lowercase words from a text fragment."""
     return re.findall(r"[A-Za-z][A-Za-z0-9&/.-]*", text)
@@ -180,7 +208,11 @@ def _subject_context(prefix: str) -> str:
 
 
 def _derive_subject(prefix: str) -> str:
-    """Extract a subject from the text immediately before a value match."""
+    """Extract a subject from the text immediately before a value match.
+    
+    Prefers meaningful content words, deduplicates adjacent repetitions,
+    and limits to 2-3 meaningful tokens for clarity.
+    """
     tokens = _words(prefix)
     if not tokens:
         return "unknown"
@@ -193,10 +225,16 @@ def _derive_subject(prefix: str) -> str:
     if not filtered:
         filtered = tokens
 
+    # Avoid truncation: use last 2-3 tokens, but deduplicate adjacent repetitions
     if len(filtered) <= 2:
-        return _strip_trailing_punctuation(" ".join(filtered))
-
-    return _strip_trailing_punctuation(" ".join(filtered[-2:]))
+        subject_text = " ".join(filtered)
+    else:
+        subject_text = " ".join(filtered[-3:])
+    
+    # Remove adjacent duplicate words (handles "Fiscal Fiscal", "March March", etc.)
+    subject_text = _deduplicate_adjacent_words(subject_text)
+    
+    return _strip_trailing_punctuation(subject_text)
 
 
 def _extract_subject_and_value(sentence: str, match: re.Match[str]) -> tuple[str, str]:
@@ -224,6 +262,36 @@ def _normalize_currency(raw_value: str, scale: str | None) -> float:
 
     multiplier = scale_map.get((scale or "").lower(), 1.0)
     return number * multiplier
+
+
+def _is_valid_quantity_unit(unit: str) -> bool:
+    """Check if a unit string is likely a valid measurement unit and not noise.
+    
+    Filters out common document artifacts (page numbers, section references, etc.)
+    and single-letter fragments that are likely truncation artifacts.
+    """
+    if not unit:
+        return False
+    
+    unit_lower = unit.lower().strip()
+    
+    # Filter known invalid patterns
+    if unit_lower in INVALID_UNIT_PATTERNS:
+        return False
+    
+    # Filter very short noise (single chars or pairs that are truncations)
+    if len(unit) <= 2 and unit_lower not in KNOWN_UNITS:
+        return False
+    
+    # Accept known valid units
+    if unit_lower in KNOWN_UNITS:
+        return True
+    
+    # Accept longer units (likely real measurement units)
+    if len(unit) >= 3:
+        return True
+    
+    return False
 
 
 def _expected_normalized_value(fact: Fact) -> float | str | None:
@@ -403,22 +471,26 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
         subject = _derive_subject(subject)
         raw_value = quantity_match.group("value")
         unit = _strip_trailing_punctuation(quantity_match.group("unit").strip())
+        
+        # Skip quantities with invalid or noisy units
+        if not _is_valid_quantity_unit(unit):
+            continue
+        
         normalized = _normalize_number(raw_value)
-        if not re.fullmatch(r"page|pages|page\s*\d+", unit, flags=re.IGNORECASE):
-            candidates.append(
-                Fact.create(
-                    subject=subject,
-                    fact_type="quantity",
-                    raw_value=raw_value,
-                    normalized_value=normalized,
-                    unit=unit,
-                    metric="quantity",
-                    evidence_text=text,
-                    page_number=page.page_number,
-                    document_id=document.document_id,
-                    document_name=document.source_name,
-                )
+        candidates.append(
+            Fact.create(
+                subject=subject,
+                fact_type="quantity",
+                raw_value=raw_value,
+                normalized_value=normalized,
+                unit=unit,
+                metric="quantity",
+                evidence_text=text,
+                page_number=page.page_number,
+                document_id=document.document_id,
+                document_name=document.source_name,
             )
+        )
 
     for date_match in DATE_RE.finditer(text):
         subject = _extract_subject_and_value(text, date_match)[0]
