@@ -1,0 +1,226 @@
+[
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\delhivery\\01-delhivery-prospectus-2022-excerpt.pdf",
+    "pdf_name": "01-delhivery-prospectus-2022-excerpt.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 100,
+      "pages_with_text": 100,
+      "pages_without_text": 0,
+      "approx_characters": 329348,
+      "empty_page_numbers": []
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 1392,
+      "fact_types": {
+        "currency": 317,
+        "percentage": 149,
+        "date": 885,
+        "quantity": 41
+      },
+      "facts_per_page": 13.92
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 1392,
+      "grounded": 1392,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 1392,
+      "grounded_in_kb": 1392,
+      "review_in_kb": 0
+    }
+  },
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\delhivery\\02-delhivery-annual-report-fy24-excerpt.pdf",
+    "pdf_name": "02-delhivery-annual-report-fy24-excerpt.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 100,
+      "pages_with_text": 100,
+      "pages_without_text": 0,
+      "approx_characters": 611268,
+      "empty_page_numbers": []
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 2473,
+      "fact_types": {
+        "date": 1680,
+        "quantity": 48,
+        "currency": 129,
+        "percentage": 616
+      },
+      "facts_per_page": 24.73
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 2473,
+      "grounded": 2473,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 2473,
+      "grounded_in_kb": 2473,
+      "review_in_kb": 0
+    }
+  },
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\delhivery\\03-delhivery-q4-fy24-earnings-presentation.pdf",
+    "pdf_name": "03-delhivery-q4-fy24-earnings-presentation.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 27,
+      "pages_with_text": 27,
+      "pages_without_text": 0,
+      "approx_characters": 21973,
+      "empty_page_numbers": []
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 516,
+      "fact_types": {
+        "date": 169,
+        "percentage": 326,
+        "currency": 19,
+        "quantity": 2
+      },
+      "facts_per_page": 19.11111111111111
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 516,
+      "grounded": 516,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 516,
+      "grounded_in_kb": 516,
+      "review_in_kb": 0
+    }
+  },
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\india-macroeconomy\\01-india-economic-survey-2024-25-excerpt.pdf",
+    "pdf_name": "01-india-economic-survey-2024-25-excerpt.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 89,
+      "pages_with_text": 89,
+      "pages_without_text": 0,
+      "approx_characters": 203118,
+      "empty_page_numbers": []
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 1088,
+      "fact_types": {
+        "quantity": 97,
+        "date": 860,
+        "currency": 103,
+        "percentage": 28
+      },
+      "facts_per_page": 12.224719101123595
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 1088,
+      "grounded": 1088,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 1088,
+      "grounded_in_kb": 1088,
+      "review_in_kb": 0
+    }
+  },
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\india-macroeconomy\\02-rbi-annual-report-2024-25-excerpt.pdf",
+    "pdf_name": "02-rbi-annual-report-2024-25-excerpt.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 100,
+      "pages_with_text": 100,
+      "pages_without_text": 0,
+      "approx_characters": 273826,
+      "empty_page_numbers": []
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 1965,
+      "fact_types": {
+        "date": 1689,
+        "quantity": 144,
+        "currency": 131,
+        "percentage": 1
+      },
+      "facts_per_page": 19.65
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 1965,
+      "grounded": 1965,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 1965,
+      "grounded_in_kb": 1965,
+      "review_in_kb": 0
+    }
+  },
+  {
+    "pdf_path": "starter-datasets\\starter-datasets\\india-macroeconomy\\03-imf-india-2025-article-iv-excerpt.pdf",
+    "pdf_name": "03-imf-india-2025-article-iv-excerpt.pdf",
+    "ingestion": {
+      "success": true,
+      "page_count": 95,
+      "pages_with_text": 94,
+      "pages_without_text": 1,
+      "approx_characters": 260204,
+      "empty_page_numbers": [
+        1
+      ]
+    },
+    "extraction": {
+      "success": true,
+      "total_facts": 1178,
+      "fact_types": {
+        "date": 1023,
+        "quantity": 36,
+        "currency": 17,
+        "percentage": 102
+      },
+      "facts_per_page": 12.53191489361702
+    },
+    "validation": {
+      "success": true,
+      "total_validated": 1178,
+      "grounded": 1178,
+      "needs_review": 0,
+      "grounded_percent": 100.0,
+      "common_validation_issues": {}
+    },
+    "knowledge": {
+      "success": true,
+      "facts_in_kb": 1178,
+      "grounded_in_kb": 1178,
+      "review_in_kb": 0
+    }
+  }
+]

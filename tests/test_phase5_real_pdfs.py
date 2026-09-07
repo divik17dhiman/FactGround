@@ -39,7 +39,7 @@ class TestDelhiveryProspectus:
         """Verify all extracted facts pass validation."""
         facts = extract_facts(document)
         validated = validate_facts(facts, document)
-        
+
         grounded = [f for f in validated if f.status == "grounded"]
         assert len(grounded) == len(validated)  # All should be grounded
         assert len(grounded) > 500
@@ -48,7 +48,7 @@ class TestDelhiveryProspectus:
         """Verify expected fact types are extracted."""
         facts = extract_facts(document)
         fact_types = {f.fact_type for f in facts}
-        
+
         assert "currency" in fact_types
         assert "date" in fact_types
         assert "percentage" in fact_types
@@ -56,27 +56,29 @@ class TestDelhiveryProspectus:
     def test_subject_quality(self, document):
         """Verify subjects are not duplicated or truncated."""
         facts = extract_facts(document)
-        
+
         # Check for repeated words like "Fiscal Fiscal"
         bad_subjects = [f.subject for f in facts if " " in f.subject]
         for subject in bad_subjects:
             words = subject.split()
             for i in range(len(words) - 1):
-                assert words[i].lower() != words[i + 1].lower(), \
+                assert words[i].lower() != words[i + 1].lower(), (
                     f"Subject has repeated words: {subject}"
+                )
 
     def test_unit_quality(self, document):
         """Verify quantity units are valid and not noise."""
         facts = extract_facts(document)
         quantity_facts = [f for f in facts if f.fact_type == "quantity"]
-        
+
         # Invalid units that should be filtered
         invalid_units = {"of", "to", "for", "from", "and", "or"}
-        
+
         for fact in quantity_facts:
             unit_lower = (fact.unit or "").lower()
-            assert unit_lower not in invalid_units, \
+            assert unit_lower not in invalid_units, (
                 f"Quantity has invalid unit: {fact.unit} for {fact.subject}"
+            )
 
 
 class TestDelhiveryAnnualReport:
@@ -104,7 +106,9 @@ class TestIndiaEconomicSurvey:
     @pytest.fixture
     def document(self):
         """Load the economic survey."""
-        pdf_path = STARTER_BASE / "india-macroeconomy" / "01-india-economic-survey-2024-25-excerpt.pdf"
+        pdf_path = (
+            STARTER_BASE / "india-macroeconomy" / "01-india-economic-survey-2024-25-excerpt.pdf"
+        )
         return ingest_pdf(str(pdf_path))
 
     def test_ingestion_succeeds(self, document):
@@ -163,11 +167,10 @@ class TestBaselineMetrics:
                 doc = ingest_pdf(str(pdf_file))
                 facts = extract_facts(doc)
                 all_facts.extend(facts)
-        
+
         # We expect 8612 facts after improvements (was 8714 before)
         # Allow ±100 variation for different systems
-        assert 8500 < len(all_facts) < 8700, \
-            f"Expected ~8612 facts, got {len(all_facts)}"
+        assert 8500 < len(all_facts) < 8700, f"Expected ~8612 facts, got {len(all_facts)}"
 
     def test_validation_passes_for_all_pdfs(self):
         """Verify 100% validation pass rate across all PDFs."""
@@ -177,7 +180,8 @@ class TestBaselineMetrics:
                 doc = ingest_pdf(str(pdf_file))
                 facts = extract_facts(doc)
                 validated = validate_facts(facts, doc)
-                
+
                 grounded = [f for f in validated if f.status == "grounded"]
-                assert len(grounded) == len(validated), \
+                assert len(grounded) == len(validated), (
                     f"Not all facts validated in {pdf_file.name}"
+                )

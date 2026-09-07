@@ -95,20 +95,60 @@ SUBJECT_BOUNDARY_RE = re.compile(r"\b(?:and|or|but)\b|[;:]", re.IGNORECASE)
 
 # Units that are too generic or frequently noise in document extraction
 INVALID_UNIT_PATTERNS = {
-    "page", "pages", "section", "chapter", "ref", "figure", "table", "note",
-    "of", "to", "from", "for", "and", "or", "by", "in", "on", "at",
-    "a", "an", "the", "as", "is", "are", "be", "been",
+    "page",
+    "pages",
+    "section",
+    "chapter",
+    "ref",
+    "figure",
+    "table",
+    "note",
+    "of",
+    "to",
+    "from",
+    "for",
+    "and",
+    "or",
+    "by",
+    "in",
+    "on",
+    "at",
+    "a",
+    "an",
+    "the",
+    "as",
+    "is",
+    "are",
+    "be",
+    "been",
 }
 
 # Known valid unit abbreviations and their normalized form
 KNOWN_UNITS = {
-    "m": "m", "mn": "mn", "million": "million", "mil": "million", 
-    "b": "bn", "bn": "bn", "billion": "billion", "bil": "billion",
-    "k": "k", "thousand": "thousand", "th": "thousand",
-    "lakh": "lakh", "cr": "crore", "crore": "crore",
-    "sq": "sq", "sqft": "sq ft", "sq ft": "sq ft", "sq m": "sq m",
-    "mt": "mt", "tonnes": "tonnes", "tons": "tons",
-    "pcs": "pcs", "pieces": "pieces", "units": "units",
+    "m": "m",
+    "mn": "mn",
+    "million": "million",
+    "mil": "million",
+    "b": "bn",
+    "bn": "bn",
+    "billion": "billion",
+    "bil": "billion",
+    "k": "k",
+    "thousand": "thousand",
+    "th": "thousand",
+    "lakh": "lakh",
+    "cr": "crore",
+    "crore": "crore",
+    "sq": "sq",
+    "sqft": "sq ft",
+    "sq ft": "sq ft",
+    "sq m": "sq m",
+    "mt": "mt",
+    "tonnes": "tonnes",
+    "tons": "tons",
+    "pcs": "pcs",
+    "pieces": "pieces",
+    "units": "units",
 }
 
 
@@ -209,7 +249,7 @@ def _subject_context(prefix: str) -> str:
 
 def _derive_subject(prefix: str) -> str:
     """Extract a subject from the text immediately before a value match.
-    
+
     Prefers meaningful content words, deduplicates adjacent repetitions,
     and limits to 2-3 meaningful tokens for clarity.
     """
@@ -230,10 +270,10 @@ def _derive_subject(prefix: str) -> str:
         subject_text = " ".join(filtered)
     else:
         subject_text = " ".join(filtered[-3:])
-    
+
     # Remove adjacent duplicate words (handles "Fiscal Fiscal", "March March", etc.)
     subject_text = _deduplicate_adjacent_words(subject_text)
-    
+
     return _strip_trailing_punctuation(subject_text)
 
 
@@ -266,31 +306,31 @@ def _normalize_currency(raw_value: str, scale: str | None) -> float:
 
 def _is_valid_quantity_unit(unit: str) -> bool:
     """Check if a unit string is likely a valid measurement unit and not noise.
-    
+
     Filters out common document artifacts (page numbers, section references, etc.)
     and single-letter fragments that are likely truncation artifacts.
     """
     if not unit:
         return False
-    
+
     unit_lower = unit.lower().strip()
-    
+
     # Filter known invalid patterns
     if unit_lower in INVALID_UNIT_PATTERNS:
         return False
-    
+
     # Filter very short noise (single chars or pairs that are truncations)
     if len(unit) <= 2 and unit_lower not in KNOWN_UNITS:
         return False
-    
+
     # Accept known valid units
     if unit_lower in KNOWN_UNITS:
         return True
-    
+
     # Accept longer units (likely real measurement units)
     if len(unit) >= 3:
         return True
-    
+
     return False
 
 
@@ -471,11 +511,11 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
         subject = _derive_subject(subject)
         raw_value = quantity_match.group("value")
         unit = _strip_trailing_punctuation(quantity_match.group("unit").strip())
-        
+
         # Skip quantities with invalid or noisy units
         if not _is_valid_quantity_unit(unit):
             continue
-        
+
         normalized = _normalize_number(raw_value)
         candidates.append(
             Fact.create(
