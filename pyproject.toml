@@ -28,7 +28,9 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-dependencies = []
+dependencies = [
+    "PyMuPDF>=1.24.0",
+]
 
 [project.optional-dependencies]
 dev = [

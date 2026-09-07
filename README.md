@@ -26,35 +26,39 @@ This is a difficult challenge because real-world documents vary in structure, te
 
 This repository is currently in:
 
-Phase 0 — Repository Foundation
+Phase 1 — PDF Ingestion and Document Representation
 
-No extraction pipeline, OCR layer, or document-specific fact logic has been implemented yet. The current focus is establishing a clean, professional project baseline that is ready for implementation work in Phase 1.
+The project now includes a lightweight PDF ingestion layer that loads source PDFs, preserves page-level provenance, and exposes a structured domain model for downstream fact extraction. This phase does not implement financial fact extraction or semantic reasoning; it focuses on robust ingestion and representation.
 
-## Planned Architecture
+## Ingestion API
 
-The eventual system is expected to follow this high-level flow:
+```python
+from superjoin_fact_knowledge import ingest_pdf
 
-```text
-PDF
-  ↓
-Document Ingestion
-  ↓
-Text / Layout Extraction
-  ↓
-Document Representation
-  ↓
-Fact Detection
-  ↓
-Fact Normalization
-  ↓
-Evidence Grounding
-  ↓
-Validation
-  ↓
-Structured Fact Knowledge Layer
+document = ingest_pdf("report.pdf")
+print(document.pages[0].page_number)
+print(document.pages[0].text)
 ```
 
-This architecture is intentionally conceptual. It defines the major concerns without locking the repository into a premature implementation choice.
+The public API returns a domain model rather than a raw PDF-library object, keeping the rest of the pipeline decoupled from the underlying PDF parser.
+
+## Architecture
+
+The ingestion pipeline follows this flow:
+
+```text
+PDF file
+  ↓
+PDF adapter (PyMuPDF)
+  ↓
+Document
+  ↓
+Page[]
+  ↓
+Page text + page provenance + diagnostics
+```
+
+The domain model preserves the original PDF page number separately from any internal indexing, ensuring later fact-extraction stages can cite evidence precisely.
 
 ## Development
 
