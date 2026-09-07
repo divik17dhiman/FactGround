@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .document import Document, Page
@@ -85,6 +86,12 @@ DATE_RE = re.compile(
     + r")\s+\d{4}|FY\d{2,4}|Q[1-4](?:\s+of\s+)?\d{4}|(?:19|20)\d{2})",
     re.IGNORECASE,
 )
+QUANTITY_RE = re.compile(
+    r"(?P<subject>[^.!?]*?)(?:had|with|reported|reached|posted|recorded|saw|operated|generated|of|at|on)\s+"
+    r"(?P<value>\d[\d,]*(?:\.\d+)?)\s*(?P<unit>[A-Za-z][A-Za-z/.-]{0,25})",
+    re.IGNORECASE,
+)
+SUBJECT_BOUNDARY_RE = re.compile(r"\b(?:and|or|but)\b|[;:]", re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -154,9 +161,22 @@ def _strip_trailing_punctuation(value: str) -> str:
     return value.strip().rstrip(".,;:!?()[]{}\"'")
 
 
+def _normalize_whitespace(text: str) -> str:
+    """Collapse repeated whitespace to make validation comparisons resilient."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _words(text: str) -> list[str]:
     """Tokenize lowercase words from a text fragment."""
     return re.findall(r"[A-Za-z][A-Za-z0-9&/.-]*", text)
+
+
+def _subject_context(prefix: str) -> str:
+    """Prefer the text segment nearest the extracted value when deriving a subject."""
+    segments = SUBJECT_BOUNDARY_RE.split(prefix)
+    if not segments:
+        return prefix
+    return segments[-1]
 
 
 def _derive_subject(prefix: str) -> str:
@@ -181,7 +201,7 @@ def _derive_subject(prefix: str) -> str:
 
 def _extract_subject_and_value(sentence: str, match: re.Match[str]) -> tuple[str, str]:
     """Return a subject phrase and raw value from a sentence-level match."""
-    prefix = sentence[: match.start()]
+    prefix = _subject_context(sentence[: match.start()])
     subject = _derive_subject(prefix)
     raw_value = match.group(0)
     return subject, raw_value
@@ -206,6 +226,129 @@ def _normalize_currency(raw_value: str, scale: str | None) -> float:
     return number * multiplier
 
 
+def _expected_normalized_value(fact: Fact) -> float | str | None:
+    """Derive the canonical normalized value implied by a fact's raw text."""
+    raw_value = fact.raw_value.strip()
+
+    if fact.fact_type == "currency":
+        currency_match = CURRENCY_RE.fullmatch(raw_value)
+        if currency_match is None:
+            return None
+        return _normalize_currency(currency_match.group("value"), currency_match.group("scale"))
+
+    if fact.fact_type == "percentage":
+        percent_match = PERCENT_RE.fullmatch(raw_value)
+        if percent_match is None:
+            return None
+        return _normalize_number(percent_match.group("value"))
+
+    if fact.fact_type == "quantity":
+        number_match = NUMBER_RE.fullmatch(raw_value)
+        if number_match is None:
+            return None
+        return _normalize_number(number_match.group(0))
+
+    if fact.fact_type == "date":
+        return raw_value
+
+    return None
+
+
+def _fact_evidence_mentions_raw_value(fact: Fact) -> bool:
+    """Check whether the evidence text contains the extracted value or a safe equivalent."""
+    evidence = _normalize_whitespace(fact.evidence_text).casefold()
+    if not evidence:
+        return False
+
+    raw_value = _normalize_whitespace(fact.raw_value).casefold()
+    if raw_value and raw_value in evidence:
+        return True
+
+    compact_raw = raw_value.replace(" ", "")
+    compact_evidence = evidence.replace(" ", "")
+    if compact_raw and compact_raw in compact_evidence:
+        return True
+
+    if fact.fact_type == "currency":
+        currency_match = CURRENCY_RE.fullmatch(fact.raw_value.strip())
+        if currency_match is not None:
+            value = currency_match.group("value").casefold()
+            value_no_commas = value.replace(",", "")
+            currency_tokens = [
+                currency_match.group("symbol"),
+                currency_match.group("name"),
+                currency_match.group("scale"),
+            ]
+            if value in evidence or value_no_commas in compact_evidence:
+                return True
+            for token in currency_tokens:
+                if token and token.casefold() in evidence:
+                    return True
+
+    if fact.fact_type == "percentage":
+        percent_value = fact.raw_value.strip().rstrip("%")
+        if percent_value and percent_value.casefold() in evidence:
+            return True
+        if percent_value and f"{percent_value}%".casefold() in evidence:
+            return True
+        if percent_value and f"{percent_value} percent".casefold() in evidence:
+            return True
+
+    if fact.fact_type == "quantity":
+        quantity_value = fact.raw_value.strip().replace(",", "")
+        if quantity_value and quantity_value.casefold() in compact_evidence:
+            return True
+
+    return False
+
+
+def validate_fact(fact: Fact, document: Document) -> Fact:
+    """Validate evidence grounding for a fact against its source document."""
+    validation_issues: list[str] = []
+
+    if not fact.document_id.strip():
+        validation_issues.append("missing_document_id")
+    if not fact.document_name.strip():
+        validation_issues.append("missing_document_name")
+
+    page_numbers = {page.page_number for page in document.pages}
+    if fact.page_number not in page_numbers:
+        validation_issues.append("invalid_page_number")
+
+    if not fact.evidence_text.strip():
+        validation_issues.append("missing_evidence")
+    elif not _fact_evidence_mentions_raw_value(fact):
+        validation_issues.append("evidence_missing_raw_value")
+
+    expected_value = _expected_normalized_value(fact)
+    if expected_value is not None:
+        if fact.normalized_value is None:
+            validation_issues.append("missing_normalized_value")
+        elif isinstance(expected_value, float):
+            if not isinstance(fact.normalized_value, (int, float)) or not math.isclose(
+                float(fact.normalized_value), expected_value, rel_tol=1e-9, abs_tol=1e-9
+            ):
+                validation_issues.append("normalized_value_mismatch")
+        elif str(fact.normalized_value).strip() != expected_value:
+            validation_issues.append("normalized_value_mismatch")
+
+    metadata = dict(fact.metadata)
+    metadata["validation_issues"] = validation_issues
+    metadata["is_grounded"] = not validation_issues
+
+    return replace(
+        fact,
+        confidence=fact.confidence if not validation_issues else min(fact.confidence, 0.5),
+        status="grounded" if not validation_issues else "needs_review",
+        metadata=metadata,
+    )
+
+
+def validate_facts(facts: list[Fact], document: Document) -> list[Fact]:
+    """Validate a batch of facts against one document."""
+    return [validate_fact(fact, document) for fact in facts]
+
+
 def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> list[Fact]:
     """Generate fact candidates from one sentence using lightweight deterministic parsing."""
     candidates: list[Fact] = []
@@ -213,8 +356,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
     if not text:
         return candidates
 
-    currency_match = CURRENCY_RE.search(text)
-    if currency_match:
+    for currency_match in CURRENCY_RE.finditer(text):
         subject, raw_value = _extract_subject_and_value(text, currency_match)
         normalized = _normalize_currency(
             currency_match.group("value"), currency_match.group("scale")
@@ -238,8 +380,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
             )
         )
 
-    percent_match = PERCENT_RE.search(text)
-    if percent_match:
+    for percent_match in PERCENT_RE.finditer(text):
         subject, raw_value = _extract_subject_and_value(text, percent_match)
         normalized = float(_normalize_number(percent_match.group("value")))
         candidates.append(
@@ -257,13 +398,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
             )
         )
 
-    quantity_pattern = re.compile(
-        r"(?P<subject>[^.!?]*?)(?:had|with|reported|reached|posted|recorded|saw|operated|generated|of|at|on)\s+"
-        r"(?P<value>\d[\d,]*(?:\.\d+)?)\s*(?P<unit>[A-Za-z][A-Za-z/.-]{0,25})",
-        re.IGNORECASE,
-    )
-    quantity_match = quantity_pattern.search(text)
-    if quantity_match:
+    for quantity_match in QUANTITY_RE.finditer(text):
         subject = _strip_trailing_punctuation(quantity_match.group("subject").strip())
         subject = _derive_subject(subject)
         raw_value = quantity_match.group("value")
@@ -285,8 +420,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
                 )
             )
 
-    date_match = DATE_RE.search(text)
-    if date_match:
+    for date_match in DATE_RE.finditer(text):
         subject = _extract_subject_and_value(text, date_match)[0]
         value = date_match.group("value")
         candidates.append(
