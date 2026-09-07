@@ -74,9 +74,23 @@ Evidence + provenance + normalized value
 
 Phase 2 adds a lightweight fact model built from the Phase 1 document representation. The extractor is intentionally deterministic and explainable rather than model-driven. It recognizes general business facts such as currencies, percentages, dates, and quantities when they appear in sentence-level text.
 
+## Phase 3 Evidence Validation
+
+```text
+Fact[]
+  ↓
+validate_fact / validate_facts
+  ↓
+Grounded fact or needs_review status
+```
+
+Phase 3 keeps the existing deterministic extractor and adds a small validation step that decides whether a fact is actually grounded in source evidence. Validation is intentionally lightweight: it checks that the document and page exist, that evidence text is present, that the evidence contains the extracted value or a recognizable equivalent, and that the normalized value is consistent with the raw representation.
+
 ## Fact model
 
 Each fact retains both the original representation and any internal normalized value. For example, a document sentence such as "Revenue increased to $12.4 million" should produce a fact that keeps `raw_value = "$12.4 million"` and `normalized_value = 12400000.0` while still storing the page number and evidence sentence.
+
+A fact becomes grounded when validation confirms the evidence path is internally consistent. The project expresses that outcome through the fact `status` field and validation diagnostics in metadata rather than by discarding the original fact object.
 
 ## Provenance strategy
 
@@ -90,6 +104,8 @@ Every extracted fact keeps:
 - confidence and status metadata
 
 This ensures later validation and comparison stages can trace back to the PDF evidence rather than relying only on interpreted values.
+
+The raw source representation is never replaced by normalization. If a value cannot be safely normalized, the implementation should preserve the raw value instead of guessing.
 
 ## Supported extraction categories
 
@@ -112,6 +128,17 @@ The current fact extractor is intentionally narrow and transparent:
 - it may ignore values that lack surrounding context
 - it does not yet perform entity resolution or relationship reasoning across the full document
 - OCR is not introduced here because the current Phase 2 scope is general text extraction from the existing document representation
+- table and layout structure are not modeled explicitly, so ambiguous tables may only be grounded to page text and nearby sentence context
+- sentence-level evidence is the current practical boundary for grounding; later phases may add richer span, table, or layout-aware grounding
+
+## Validation behavior
+
+Validation is intentionally permissive and diagnostic rather than brittle.
+
+- Missing evidence or an invalid page number marks a fact for review.
+- A normalization mismatch marks a fact for review rather than throwing away the extraction.
+- Empty pages and malformed page text are tolerated by the validation layer.
+- Facts that are uncertain or weakly grounded remain available with their original raw source values intact.
 
 ## Why we keep the model simple
 

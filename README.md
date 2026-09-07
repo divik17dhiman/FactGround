@@ -26,23 +26,23 @@ This is a difficult challenge because real-world documents vary in structure, te
 
 This repository is currently in:
 
-Phase 2 — Deterministic Fact Extraction
+Phase 3 — Grounded Evidence Validation
 
-The project includes a stable PDF ingestion layer and an initial fact-extraction stage built on top of the Phase 1 domain model. The current extractor intentionally uses deterministic parsing rules for general business facts such as currencies, percentages, dates, and quantities while preserving the original source value and page provenance.
+The project includes a stable PDF ingestion layer, deterministic fact extraction, and lightweight evidence validation built on top of the Phase 1 domain model. The current extractor intentionally uses deterministic parsing rules for general business facts such as currencies, percentages, dates, and quantities while preserving the original source value, normalized value, page provenance, and source evidence.
 
 ## Public APIs
 
 ```python
-from superjoin_fact_knowledge import extract_facts, ingest_pdf
+from superjoin_fact_knowledge import extract_facts, ingest_pdf, validate_facts
 
 document = ingest_pdf("report.pdf")
-facts = extract_facts(document)
+facts = validate_facts(extract_facts(document), document)
 
 for fact in facts:
-    print(fact.fact_type, fact.raw_value, fact.page_number)
+    print(fact.fact_type, fact.raw_value, fact.page_number, fact.status)
 ```
 
-The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance.
+The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance. Validation then checks whether each fact is actually grounded in the source document before treating it as fully trusted.
 
 ## Architecture
 
@@ -61,10 +61,25 @@ Deterministic fact extraction
   ↓
 Structured Facts
   ↓
-Evidence + provenance
+Evidence validation
+  ↓
+Grounded facts with provenance
 ```
 
-The Phase 2 fact model keeps both the raw value as it appeared in the PDF and any normalized internal representation, while retaining the page number and evidence text needed for later validation and grounding.
+The fact model keeps both the raw value as it appeared in the PDF and any normalized internal representation, while retaining the page number and evidence text needed for later validation and grounding. Validation does not replace the raw source representation; it only records whether the evidence is strong enough to treat the fact as grounded.
+
+## Grounded Facts
+
+A grounded fact answers four questions without losing source traceability:
+
+- What value was extracted?
+- How was it normalized?
+- Which page did it come from?
+- What source evidence supports it?
+
+In this repository, a fact is considered grounded when the document exists, the page number is valid, the evidence text is present, the evidence contains the extracted value or an equivalent representation, and the normalized value is consistent with the raw source text.
+
+Validated facts surface grounding state through `status` and validation diagnostics in metadata. Facts that fail validation are not discarded; they are marked for review instead.
 
 ## Development
 
@@ -121,3 +136,9 @@ ruff format .
 ## Notes
 
 This repository is intentionally being structured as a production-quality foundation rather than a collection of ad hoc scripts. The objective is to create a clean engineering baseline suitable for future implementation work while preserving the assignment's requirement to remain generalizable across unseen PDFs.
+
+## Limitations
+
+- Table structure is not modeled explicitly, so ambiguous tables may only be grounded to page text and nearby sentence context.
+- Sentence-level evidence is the current practical boundary for grounding; later phases may add richer span, table, or layout-aware grounding.
+- The project does not attempt question answering, embeddings, vector search, or chat-style interfaces in this phase.
