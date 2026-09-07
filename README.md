@@ -26,39 +26,45 @@ This is a difficult challenge because real-world documents vary in structure, te
 
 This repository is currently in:
 
-Phase 1 — PDF Ingestion and Document Representation
+Phase 2 — Deterministic Fact Extraction
 
-The project now includes a lightweight PDF ingestion layer that loads source PDFs, preserves page-level provenance, and exposes a structured domain model for downstream fact extraction. This phase does not implement financial fact extraction or semantic reasoning; it focuses on robust ingestion and representation.
+The project includes a stable PDF ingestion layer and an initial fact-extraction stage built on top of the Phase 1 domain model. The current extractor intentionally uses deterministic parsing rules for general business facts such as currencies, percentages, dates, and quantities while preserving the original source value and page provenance.
 
-## Ingestion API
+## Public APIs
 
 ```python
-from superjoin_fact_knowledge import ingest_pdf
+from superjoin_fact_knowledge import extract_facts, ingest_pdf
 
 document = ingest_pdf("report.pdf")
-print(document.pages[0].page_number)
-print(document.pages[0].text)
+facts = extract_facts(document)
+
+for fact in facts:
+    print(fact.fact_type, fact.raw_value, fact.page_number)
 ```
 
-The public API returns a domain model rather than a raw PDF-library object, keeping the rest of the pipeline decoupled from the underlying PDF parser.
+The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance.
 
 ## Architecture
 
-The ingestion pipeline follows this flow:
+The current pipeline follows this flow:
 
 ```text
 PDF file
   ↓
-PDF adapter (PyMuPDF)
+PyMuPDF adapter
   ↓
 Document
   ↓
 Page[]
   ↓
-Page text + page provenance + diagnostics
+Deterministic fact extraction
+  ↓
+Structured Facts
+  ↓
+Evidence + provenance
 ```
 
-The domain model preserves the original PDF page number separately from any internal indexing, ensuring later fact-extraction stages can cite evidence precisely.
+The Phase 2 fact model keeps both the raw value as it appeared in the PDF and any normalized internal representation, while retaining the page number and evidence text needed for later validation and grounding.
 
 ## Development
 

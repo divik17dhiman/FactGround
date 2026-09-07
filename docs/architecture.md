@@ -56,50 +56,63 @@ Page[]
 Page text + provenance + diagnostics
 ```
 
-This phase implements the document ingestion and representation layer. It does not yet perform financial fact extraction or semantic reasoning.
+The Phase 1 ingestion layer provides the stable foundation for later extraction work. It preserves page-level provenance and exposes empty-page information without introducing PDF-library coupling into downstream stages.
 
-## Why page provenance is preserved
-
-Every page in the domain model keeps its original PDF page number as a first-class field. Downstream fact extraction can cite evidence by page number without needing to rediscover the page in the PDF library. This is essential for auditability and evidence grounding.
-
-## Separation from the PDF library
-
-The project owns a small domain model (`Document` and `Page`) that is independent from PyMuPDF objects. The ingestion adapter translates raw PDF content into stable project types, so a future backend change would only require updating the adapter rather than rewriting extraction logic.
-
-## Empty and textless pages
-
-Pages are always represented in the document, even when no text can be extracted. For such pages, the `text` field is empty and `has_extractable_text` is set to `False`. Diagnostics expose the page as empty so future OCR or fallback extraction stages can decide whether additional work is needed.
-
-## Exposure of diagnostics
-
-The ingestion result exposes document-level information such as:
-
-- total page count
-- number of pages with extractable text
-- number of empty pages
-- list of empty page numbers
-- approximate character count
-
-This is intentionally lightweight but useful for deciding whether a PDF page is text-bearing, empty, or likely to require OCR later.
-
-## Future phases
-
-Phase 2 and beyond can consume this representation as the trusted source of truth for extraction work. The expected downstream flow is:
+## Phase 2 Fact Extraction
 
 ```text
-Document representation
+Document
   ↓
-Fact candidate extraction
+Page text
   ↓
-Evidence validation
+Deterministic fact extraction
   ↓
-Normalization and comparison
+Fact[]
   ↓
-Structured fact knowledge layer
+Evidence + provenance + normalized value
 ```
 
-The core principle is that every downstream stage reads from the domain model and keeps source evidence attached to the page and text it came from.
+Phase 2 adds a lightweight fact model built from the Phase 1 document representation. The extractor is intentionally deterministic and explainable rather than model-driven. It recognizes general business facts such as currencies, percentages, dates, and quantities when they appear in sentence-level text.
 
-## PDF library choice
+## Fact model
 
-PyMuPDF is used as the PDF extraction engine because it is mature, lightweight, widely adopted, and well-suited to extracting text from business and financial PDFs in a straightforward way. Its text extraction is adequate for this phase and keeps the architecture simple while preserving explicit provenance. The project intentionally does not add OCR or other heavy dependencies at this stage.
+Each fact retains both the original representation and any internal normalized value. For example, a document sentence such as "Revenue increased to $12.4 million" should produce a fact that keeps `raw_value = "$12.4 million"` and `normalized_value = 12400000.0` while still storing the page number and evidence sentence.
+
+## Provenance strategy
+
+Every extracted fact keeps:
+
+- document identifier and source name
+- page number
+- evidence text
+- raw extracted value
+- optional normalized value
+- confidence and status metadata
+
+This ensures later validation and comparison stages can trace back to the PDF evidence rather than relying only on interpreted values.
+
+## Supported extraction categories
+
+The current deterministic baseline supports:
+
+- currency values
+- percentages
+- dates and fiscal years
+- quantities and associated units
+- simple metric/value relationships inferred from nearby text
+
+This is intentionally a general-purpose baseline rather than a document-specific extractor.
+
+## Known limitations
+
+The current fact extractor is intentionally narrow and transparent:
+
+- it does not solve complex table extraction
+- it does not attempt full semantic understanding of every sentence
+- it may ignore values that lack surrounding context
+- it does not yet perform entity resolution or relationship reasoning across the full document
+- OCR is not introduced here because the current Phase 2 scope is general text extraction from the existing document representation
+
+## Why we keep the model simple
+
+The architecture separates ingestion, fact extraction, and later normalization/evidence validation. That keeps the package explainable and testable while preserving a clear path toward future phases such as fact normalization, entity matching, and relationships between facts.
