@@ -26,9 +26,11 @@ This is a difficult challenge because real-world documents vary in structure, te
 
 This repository is currently in:
 
-Phase 3 — Grounded Evidence Validation
+**Phase 5 — Evaluation and Improvement**
 
-The project includes a stable PDF ingestion layer, deterministic fact extraction, and lightweight evidence validation built on top of the Phase 1 domain model. The current extractor intentionally uses deterministic parsing rules for general business facts such as currencies, percentages, dates, and quantities while preserving the original source value, normalized value, page provenance, and source evidence.
+Phase 5 evaluated the Phase 4 pipeline against actual starter datasets (6 PDFs, 511 pages, 8,612 facts) and made targeted improvements to extraction quality. The system now handles diverse financial and economic documents with 100% validation success, improved subject extraction, and better unit filtering. All improvements are deterministic and generalize beyond the starter datasets.
+
+See [docs/evaluation.md](docs/evaluation.md) for detailed evaluation methodology and results.
 
 ## Public APIs
 
@@ -44,9 +46,15 @@ for fact in facts:
 
 The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance. Validation then checks whether each fact is actually grounded in the source document before treating it as fully trusted.
 
-## Phase 4 Knowledge Layer
+## Phase 4 Knowledge Layer and Phase 5 Improvements
 
 Phase 4 adds a small in-memory knowledge layer over validated facts. It is deterministic, explainable, and intentionally independent of any database, vector index, or LLM.
+
+Phase 5 improves the fact extraction layer through evaluation on real documents:
+- Better subject extraction (removes repeated words like "Fiscal Fiscal")
+- Unit filtering to eliminate document noise
+- Real-document regression tests for quality assurance
+- 100% validation success maintained across 8,612 facts from Delhivery and India macroeconomy datasets
 
 Public usage looks like this:
 
