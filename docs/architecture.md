@@ -140,6 +140,31 @@ Validation is intentionally permissive and diagnostic rather than brittle.
 - Empty pages and malformed page text are tolerated by the validation layer.
 - Facts that are uncertain or weakly grounded remain available with their original raw source values intact.
 
+## Phase 4 Knowledge Querying
+
+```text
+Grounded facts
+  ↓
+KnowledgeBase
+  ↓
+deterministic query scoring
+  ↓
+ranked fact candidates
+  ↓
+structured grounded result
+```
+
+Phase 4 introduces a small in-memory knowledge layer over validated facts. It stores facts without mutating them, preserves provenance, and ranks query candidates using transparent matching signals such as subject overlap, fact-type overlap, unit overlap, and year/date overlap.
+
+The query layer is conservative by design:
+
+- grounded facts are preferred over `needs_review` facts
+- tied top candidates are returned as ambiguous rather than collapsed into one answer
+- queries without a sufficiently relevant grounded fact return an explicit no-answer result
+- the formatted answer, when present, is only a summary of the selected grounded fact and not a new inference
+
+The query API remains library-independent and in-memory so a later semantic search or LLM layer can be added behind the same contract without replacing the deterministic baseline.
+
 ## Why we keep the model simple
 
 The architecture separates ingestion, fact extraction, and later normalization/evidence validation. That keeps the package explainable and testable while preserving a clear path toward future phases such as fact normalization, entity matching, and relationships between facts.

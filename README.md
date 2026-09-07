@@ -44,6 +44,37 @@ for fact in facts:
 
 The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance. Validation then checks whether each fact is actually grounded in the source document before treating it as fully trusted.
 
+## Phase 4 Knowledge Layer
+
+Phase 4 adds a small in-memory knowledge layer over validated facts. It is deterministic, explainable, and intentionally independent of any database, vector index, or LLM.
+
+Public usage looks like this:
+
+```python
+from superjoin_fact_knowledge import (
+    KnowledgeBase,
+    extract_facts,
+    ingest_pdf,
+    query_facts,
+    validate_facts,
+)
+
+document = ingest_pdf("report.pdf")
+validated_facts = validate_facts(extract_facts(document), document)
+knowledge_base = KnowledgeBase.from_facts(validated_facts)
+result = query_facts(knowledge_base, "revenue in 2025")
+```
+
+The knowledge layer returns grounded fact candidates in deterministic relevance order and preserves provenance on every result. It does not convert the facts into untraceable answer strings. Instead, callers receive the matching fact, its value, normalized value, page number, source document, evidence text, and grounding status.
+
+Query behavior is intentionally conservative:
+
+- grounded facts are preferred by default
+- `needs_review` facts stay separate unless a caller explicitly asks to inspect them
+- tied top candidates are reported as ambiguous rather than arbitrarily collapsed into one answer
+- no sufficiently relevant fact produces an explicit no-answer result
+- the answer formatter only summarizes a selected grounded fact and never invents unsupported details
+
 ## Architecture
 
 The current pipeline follows this flow:
@@ -80,6 +111,8 @@ A grounded fact answers four questions without losing source traceability:
 In this repository, a fact is considered grounded when the document exists, the page number is valid, the evidence text is present, the evidence contains the extracted value or an equivalent representation, and the normalized value is consistent with the raw source text.
 
 Validated facts surface grounding state through `status` and validation diagnostics in metadata. Facts that fail validation are not discarded; they are marked for review instead.
+
+The Phase 4 knowledge layer treats grounded facts as authoritative candidates and keeps `needs_review` facts out of default answer selection. Review facts remain queryable for inspection, but they are never silently promoted to grounded answers.
 
 ## Development
 
@@ -142,3 +175,4 @@ This repository is intentionally being structured as a production-quality founda
 - Table structure is not modeled explicitly, so ambiguous tables may only be grounded to page text and nearby sentence context.
 - Sentence-level evidence is the current practical boundary for grounding; later phases may add richer span, table, or layout-aware grounding.
 - The project does not attempt question answering, embeddings, vector search, or chat-style interfaces in this phase.
+- Querying is still deterministic and pattern-based; it does not perform open-ended natural-language understanding.
