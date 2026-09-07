@@ -57,7 +57,7 @@ class Document:
         source_metadata: dict[str, Any],
         pages: list[Page],
         diagnostics: DocumentDiagnostics,
-    ) -> "Document":
+    ) -> Document:
         """Construct a document while generating a stable internal identifier."""
         return cls(
             document_id=uuid.uuid4().hex,
