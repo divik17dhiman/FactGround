@@ -165,6 +165,30 @@ The query layer is conservative by design:
 
 The query API remains library-independent and in-memory so a later semantic search or LLM layer can be added behind the same contract without replacing the deterministic baseline.
 
+## Phase 6 End-to-End Workflow and Evaluator Contract
+
+```text
+PDF file(s)
+  ↓
+build_knowledge_base()
+  [ingest_pdf → extract_facts → validate_facts]
+  ↓
+KnowledgeBase (multi-document, immutable)
+  ↓
+query() / kb.query()
+  ↓
+QueryResult (status, is_grounded, answer, evidence, to_dict())
+  ↓
+CLI (`python -m superjoin_fact_knowledge` or `superjoin`)
+```
+
+Phase 6 integrates the entire pipeline into a clean, minimal public interface:
+
+1. **High-Level Workflow**: `build_knowledge_base(pdf_paths)` handles ingestion, fact extraction, and grounding validation across one or multiple PDFs, returning an aggregated, queryable `KnowledgeBase`.
+2. **Multi-Document Support**: Facts retain `document_name` and `document_id` so cross-document provenance is always explicit.
+3. **Structured Result Contract**: `QueryResult` provides `.is_grounded`, `.top_fact`, and `.to_dict()` methods, producing a JSON-serializable dictionary with answers, candidates, and full evidence provenance.
+4. **Evaluator CLI**: A command-line interface (`superjoin` or `python -m superjoin_fact_knowledge`) allowing evaluators to query arbitrary PDFs from terminal with human-readable or `--json` structured output.
+
 ## Why we keep the model simple
 
-The architecture separates ingestion, fact extraction, and later normalization/evidence validation. That keeps the package explainable and testable while preserving a clear path toward future phases such as fact normalization, entity matching, and relationships between facts.
+The architecture separates ingestion, fact extraction, evidence validation, knowledge querying, and the evaluator interface. That keeps the package explainable and testable while preserving a clear path toward future phases such as fact normalization, entity matching, and relationships between facts.

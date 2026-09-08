@@ -24,64 +24,142 @@ This is a difficult challenge because real-world documents vary in structure, te
 
 ## Current Status
 
-This repository is currently in:
+This repository is in:
 
-**Phase 5 — Evaluation and Improvement**
+**Phase 6 — End-to-End Evaluator Workflow & Usability Integration**
 
-Phase 5 evaluated the Phase 4 pipeline against actual starter datasets (6 PDFs, 511 pages, 8,612 facts) and made targeted improvements to extraction quality. The system now handles diverse financial and economic documents with 100% validation success, improved subject extraction, and better unit filtering. All improvements are deterministic and generalize beyond the starter datasets.
+Phase 6 integrates the entire pipeline into a clean, evaluator-facing end-to-end workflow:
+- High-level public workflow: `build_knowledge_base(pdf_paths)` and `query(knowledge_base, question)`
+- Single and multi-document knowledge base aggregation with preserved source document provenance
+- Stable structured result representation (`QueryResult.to_dict()`, `.is_grounded`, `.top_fact`, and evidence list)
+- Command-line interface (`superjoin` or `python -m superjoin_fact_knowledge`) supporting human-readable and `--json` structured output
+- 58 passing tests covering unit parsing, integration workflows, multi-document querying, real PDF evaluation, and CLI execution
 
-See [docs/evaluation.md](docs/evaluation.md) for detailed evaluation methodology and results.
+## Quick Start for Evaluators
 
-## Public APIs
+### 1. Installation
 
-```python
-from superjoin_fact_knowledge import extract_facts, ingest_pdf, validate_facts
+From a fresh checkout of the repository:
 
-document = ingest_pdf("report.pdf")
-facts = validate_facts(extract_facts(document), document)
+```bash
+# Create virtual environment
+python -m venv .venv
 
-for fact in facts:
-    print(fact.fact_type, fact.raw_value, fact.page_number, fact.status)
+# Activate (Linux/macOS)
+source .venv/bin/activate
+
+# Activate (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Install package with development tools
+python -m pip install -e ".[dev]"
 ```
 
-The ingestion API returns a project-owned `Document` model rather than a raw PDF-library object. The fact extractor consumes that model and emits structured facts with page- and evidence-level provenance. Validation then checks whether each fact is actually grounded in the source document before treating it as fully trusted.
-
-## Phase 4 Knowledge Layer and Phase 5 Improvements
-
-Phase 4 adds a small in-memory knowledge layer over validated facts. It is deterministic, explainable, and intentionally independent of any database, vector index, or LLM.
-
-Phase 5 improves the fact extraction layer through evaluation on real documents:
-- Better subject extraction (removes repeated words like "Fiscal Fiscal")
-- Unit filtering to eliminate document noise
-- Real-document regression tests for quality assurance
-- 100% validation success maintained across 8,612 facts from Delhivery and India macroeconomy datasets
-
-Public usage looks like this:
+### 2. Evaluator Python Workflow
 
 ```python
-from superjoin_fact_knowledge import (
-    KnowledgeBase,
-    extract_facts,
-    ingest_pdf,
-    query_facts,
-    validate_facts,
-)
+from superjoin_fact_knowledge import build_knowledge_base, query
 
-document = ingest_pdf("report.pdf")
-validated_facts = validate_facts(extract_facts(document), document)
-knowledge_base = KnowledgeBase.from_facts(validated_facts)
-result = query_facts(knowledge_base, "revenue in 2025")
+# 1. Build knowledge base from one or multiple PDFs
+# Ingestion -> Fact Extraction -> Evidence Validation -> In-Memory Knowledge Base
+kb = build_knowledge_base("report.pdf")
+# Or multi-document:
+# kb = build_knowledge_base(["report1.pdf", "report2.pdf"])
+
+# 2. Query with natural language or keywords
+result = query(kb, "operating margin in FY2024")
+
+# 3. Inspect grounded answer
+if result.is_grounded:
+    print("Answer:", result.answer_text)
+    print("Document:", result.top_fact.document_name)
+    print("Page:", result.top_fact.page_number)
+    print("Evidence:", result.top_fact.evidence_text)
+else:
+    print("Status:", result.status)  # 'ambiguous' or 'no_grounded_answer'
+
+# 4. Access full structured serialization
+structured_data = result.to_dict()
+print(structured_data)
 ```
 
-The knowledge layer returns grounded fact candidates in deterministic relevance order and preserves provenance on every result. It does not convert the facts into untraceable answer strings. Instead, callers receive the matching fact, its value, normalized value, page number, source document, evidence text, and grounding status.
+### 3. Command-Line Interface (CLI)
 
-Query behavior is intentionally conservative:
+The package provides a built-in CLI via `superjoin` or `python -m superjoin_fact_knowledge`:
 
-- grounded facts are preferred by default
-- `needs_review` facts stay separate unless a caller explicitly asks to inspect them
-- tied top candidates are reported as ambiguous rather than arbitrarily collapsed into one answer
-- no sufficiently relevant fact produces an explicit no-answer result
-- the answer formatter only summarizes a selected grounded fact and never invents unsupported details
+**Human-Readable Terminal Output:**
+```bash
+python -m superjoin_fact_knowledge report.pdf -q "revenue in FY2024"
+```
+
+**Structured JSON Output:**
+```bash
+python -m superjoin_fact_knowledge report.pdf -q "revenue in FY2024" --json
+```
+
+**Multi-Document Querying:**
+```bash
+python -m superjoin_fact_knowledge doc1.pdf doc2.pdf -q "total shipments"
+```
+
+### 4. Structured Output Contract
+
+Query results return structured objects with `.to_dict()` serialization:
+
+```json
+{
+  "query": "operating margin in FY2024",
+  "status": "answer_found",
+  "is_grounded": true,
+  "answer": "Operating margin was 21.5%.",
+  "explanation": "subject_phrase_match; year_match:2024; grounded_fact",
+  "matches": [
+    {
+      "score": 18.5,
+      "reasons": ["subject_phrase_match", "year_match:2024", "grounded_fact"],
+      "fact": {
+        "fact_id": "8f3a...",
+        "subject": "Operating margin",
+        "fact_type": "percentage",
+        "raw_value": "21.5%",
+        "normalized_value": 21.5,
+        "unit": "percent",
+        "metric": "percentage",
+        "evidence": "Operating margin improved to 21.5% in FY2024.",
+        "page": 3,
+        "document": "report.pdf",
+        "document_id": "e4b1...",
+        "confidence": 1.0,
+        "status": "grounded"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "document": "report.pdf",
+      "page": 3,
+      "text": "Operating margin improved to 21.5% in FY2024.",
+      "raw_value": "21.5%",
+      "normalized_value": 21.5,
+      "unit": "percent"
+    }
+  ]
+}
+```
+
+### 5. Modular Low-Level APIs
+
+For granular pipeline access:
+
+```python
+from superjoin_fact_knowledge import extract_facts, ingest_pdf, validate_facts, KnowledgeBase
+
+doc = ingest_pdf("report.pdf")
+facts = extract_facts(doc)
+validated_facts = validate_facts(facts, doc)
+kb = KnowledgeBase.from_facts(validated_facts)
+result = kb.query("revenue")
+```
 
 ## Architecture
 
