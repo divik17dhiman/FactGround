@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .fact import Fact
+from .fact import Fact, extract_entity_from_subject, extract_period
 
 # Public relationship states as mandated by assignment specification
 CORROBORATED = "CORROBORATED"
@@ -37,6 +37,25 @@ STOPWORDS = {
     "was",
     "were",
     "with",
+}
+
+GENERIC_SUBJECT_WORDS = {
+    "aggregating",
+    "shares",
+    "equity",
+    "share",
+    "value",
+    "total",
+    "amount",
+    "number",
+    "size",
+    "details",
+    "type",
+    "million",
+    "billion",
+    "thousand",
+    "crore",
+    "lakh",
 }
 
 
@@ -74,10 +93,44 @@ def _tokens(text: str) -> set[str]:
     }
 
 
-def _extract_years(fact: Fact) -> set[str]:
-    """Extract 4-digit calendar years from fact subject, raw value, and evidence."""
+def _get_period(fact: Fact) -> str | None:
+    """Retrieve or deterministically extract a reliable reporting period for the fact."""
+    if fact.period:
+        return fact.period
     combined = f"{fact.subject} {fact.raw_value} {fact.evidence_text}"
-    return {match.group(1) for match in YEAR_RE.finditer(combined)}
+    return extract_period(combined)
+
+
+def _periods_match(p_a: str, p_b: str) -> bool:
+    """Check whether two reporting period strings represent the same period."""
+    if p_a.casefold() == p_b.casefold():
+        return True
+    norm_a = p_a.upper().replace("FY", "").strip()
+    norm_b = p_b.upper().replace("FY", "").strip()
+    return norm_a == norm_b
+
+
+def _get_scope(fact: Fact) -> str | None:
+    """Get the scope/context of a fact from metadata or subject text."""
+    if fact.scope:
+        return fact.scope
+    s_lower = fact.subject.lower()
+    if "fresh issue" in s_lower:
+        return "Fresh Issue"
+    if "offer for sale" in s_lower:
+        return "Offer for Sale"
+    if "total offer" in s_lower or "offer of equity shares" in s_lower:
+        return "Total Offer"
+    if "face value" in s_lower:
+        return "Face Value"
+    return None
+
+
+def _get_entity(fact: Fact) -> str | None:
+    """Get the entity of a fact from metadata or subject text."""
+    if fact.entity:
+        return fact.entity
+    return extract_entity_from_subject(fact.subject)
 
 
 def _subjects_compatible(subject_a: str, subject_b: str) -> bool:
@@ -93,7 +146,12 @@ def _subjects_compatible(subject_a: str, subject_b: str) -> bool:
 
     tokens_a = _tokens(norm_a)
     tokens_b = _tokens(norm_b)
-    return bool(tokens_a & tokens_b)
+    overlap = tokens_a & tokens_b
+    if not overlap:
+        return False
+
+    meaningful_overlap = overlap - GENERIC_SUBJECT_WORDS
+    return bool(meaningful_overlap)
 
 
 def _units_compatible(unit_a: str | None, unit_b: str | None) -> bool:
@@ -129,8 +187,8 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
         - CORROBORATED: Facts report consistent values for the same subject and period.
         - CONTRADICTED: Facts report conflicting values for the same subject and period.
         - CONTEXTUALLY_RECONCILED: Values differ due to explainable temporal or reporting context.
-        - INCOMPARABLE: Facts differ in dimension, unit, or entity.
-        - UNCERTAIN: Evidence or validation confidence is insufficient.
+        - INCOMPARABLE: Facts differ in dimension, unit, entity, or scope.
+        - UNCERTAIN: Validation is insufficient, or period context is missing.
     """
     # 1. Evidence Grounding Check
     if fact_a.status != "grounded" or fact_b.status != "grounded":
@@ -149,7 +207,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             fact_a=fact_a,
             fact_b=fact_b,
             confidence=1.0,
-            explanation=(f"Incomparable fact types: '{fact_a.fact_type}' vs '{fact_b.fact_type}'."),
+            explanation=f"Incomparable fact types: '{fact_a.fact_type}' vs '{fact_b.fact_type}'.",
         )
 
     # 3. Unit Compatibility Check
@@ -159,10 +217,34 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             fact_a=fact_a,
             fact_b=fact_b,
             confidence=1.0,
-            explanation=(f"Incompatible measurement units: '{fact_a.unit}' vs '{fact_b.unit}'."),
+            explanation=f"Incompatible measurement units: '{fact_a.unit}' vs '{fact_b.unit}'.",
         )
 
-    # 4. Entity / Subject Compatibility Check
+    # 4. Entity Compatibility Check
+    entity_a = _get_entity(fact_a)
+    entity_b = _get_entity(fact_b)
+    if entity_a and entity_b and entity_a.casefold() != entity_b.casefold():
+        return FactRelationship(
+            state=INCOMPARABLE,
+            fact_a=fact_a,
+            fact_b=fact_b,
+            confidence=1.0,
+            explanation=f"Facts refer to different entities: '{entity_a}' vs '{entity_b}'.",
+        )
+
+    # 5. Scope / Context Check (Component vs Aggregate or Different Scopes)
+    scope_a = _get_scope(fact_a)
+    scope_b = _get_scope(fact_b)
+    if scope_a and scope_b and scope_a.casefold() != scope_b.casefold():
+        return FactRelationship(
+            state=INCOMPARABLE,
+            fact_a=fact_a,
+            fact_b=fact_b,
+            confidence=1.0,
+            explanation=f"The values refer to different scopes: '{scope_a}' and '{scope_b}'.",
+        )
+
+    # 6. Entity / Subject Compatibility Check
     if not _subjects_compatible(fact_a.subject, fact_b.subject):
         return FactRelationship(
             state=INCOMPARABLE,
@@ -175,14 +257,14 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             ),
         )
 
-    # 5. Temporal / Period Context Check
-    years_a = _extract_years(fact_a)
-    years_b = _extract_years(fact_b)
-    has_years = bool(years_a and years_b)
-    same_period = has_years and bool(years_a & years_b)
-    different_period = has_years and not (years_a & years_b)
+    # 7. Temporal / Period Context Check
+    period_a = _get_period(fact_a)
+    period_b = _get_period(fact_b)
+    has_periods = bool(period_a and period_b)
+    same_period = has_periods and _periods_match(period_a, period_b)
+    different_period = has_periods and not same_period
 
-    # 6. Value Comparison
+    # 8. Value Comparison
     val_a = fact_a.normalized_value
     val_b = fact_b.normalized_value
 
@@ -192,7 +274,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
         values_match = math.isclose(num_a, num_b, rel_tol=1e-3, abs_tol=1e-3)
 
         if values_match:
-            period_str = f" in {','.join(sorted(years_a))}" if years_a else ""
+            period_str = f" in {period_a}" if period_a else ""
             return FactRelationship(
                 state=CORROBORATED,
                 fact_a=fact_a,
@@ -205,8 +287,6 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
 
         # Values differ: Check if temporal context explains the difference
         if different_period:
-            p_a = ",".join(sorted(years_a))
-            p_b = ",".join(sorted(years_b))
             return FactRelationship(
                 state=CONTEXTUALLY_RECONCILED,
                 fact_a=fact_a,
@@ -214,12 +294,11 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
                 confidence=1.0,
                 explanation=(
                     f"Values differ ({fact_a.raw_value} vs {fact_b.raw_value}) "
-                    f"due to different reporting periods ({p_a} vs {p_b})."
+                    f"due to different reporting periods ({period_a} vs {period_b})."
                 ),
             )
 
         if same_period:
-            p_str = ",".join(sorted(years_a))
             return FactRelationship(
                 state=CONTRADICTED,
                 fact_a=fact_a,
@@ -227,11 +306,11 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
                 confidence=1.0,
                 explanation=(
                     f"Contradicting values ({fact_a.raw_value} vs {fact_b.raw_value}) "
-                    f"reported for the same period ({p_str})."
+                    f"reported for the same period ({period_a})."
                 ),
             )
 
-        # Values differ without explicit period metadata
+        # Values differ without confirmed reporting periods
         return FactRelationship(
             state=UNCERTAIN,
             fact_a=fact_a,
@@ -245,17 +324,16 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
 
     # Fallback for non-numeric (string / date) representations
     if str(val_a).strip().casefold() == str(val_b).strip().casefold():
+        period_str = f" in {period_a}" if period_a else ""
         return FactRelationship(
             state=CORROBORATED,
             fact_a=fact_a,
             fact_b=fact_b,
             confidence=1.0,
-            explanation=f"Facts corroborate with identical representation '{val_a}'.",
+            explanation=f"Facts corroborate with identical representation '{val_a}'{period_str}.",
         )
 
     if different_period:
-        p_a = ",".join(sorted(years_a))
-        p_b = ",".join(sorted(years_b))
         return FactRelationship(
             state=CONTEXTUALLY_RECONCILED,
             fact_a=fact_a,
@@ -263,14 +341,29 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             confidence=1.0,
             explanation=(
                 f"Representations differ ({fact_a.raw_value} vs {fact_b.raw_value}) "
-                f"across different periods ({p_a} vs {p_b})."
+                f"across different periods ({period_a} vs {period_b})."
+            ),
+        )
+
+    if same_period:
+        return FactRelationship(
+            state=CONTRADICTED,
+            fact_a=fact_a,
+            fact_b=fact_b,
+            confidence=1.0,
+            explanation=(
+                f"Representations contradict: '{fact_a.raw_value}' vs '{fact_b.raw_value}' "
+                f"reported for the same period ({period_a})."
             ),
         )
 
     return FactRelationship(
-        state=CONTRADICTED,
+        state=UNCERTAIN,
         fact_a=fact_a,
         fact_b=fact_b,
-        confidence=1.0,
-        explanation=f"Representations contradict: '{fact_a.raw_value}' vs '{fact_b.raw_value}'.",
+        confidence=0.7,
+        explanation=(
+            f"Representations differ ({fact_a.raw_value} vs {fact_b.raw_value}) "
+            f"but reporting periods cannot be confirmed."
+        ),
     )

@@ -60,7 +60,10 @@ def test_openapi_schema_documents_upload_control(client: TestClient) -> None:
         body_def = req_body_schema
 
     assert "files" in body_def["properties"]
-    assert body_def["properties"]["files"]["type"] == "array"
+    files_prop = body_def["properties"]["files"]
+    assert files_prop["type"] == "array"
+    assert files_prop["items"]["type"] == "string"
+    assert files_prop["items"]["format"] == "binary"
     assert "files" in body_def["required"]
 
 

@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel, Field
+from fastapi.openapi.utils import get_openapi
+from pydantic import BaseModel, Field, GetJsonSchemaHandler
 
 from .ingestion import PDFIngestionError
 from .knowledge import KnowledgeBase
@@ -48,6 +50,16 @@ def reset_knowledge_base() -> None:
     _kb = KnowledgeBase.empty()
 
 
+class PDFUploadFile(UploadFile):
+    """UploadFile subclass that emits format: binary in OpenAPI JSON schema for Swagger UI."""
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: Mapping[str, Any], handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        return {"type": "string", "format": "binary"}
+
+
 app = FastAPI(
     title="SuperJoin Fact Knowledge Layer API",
     description=(
@@ -56,6 +68,30 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
+
+def custom_openapi() -> dict[str, Any]:
+    """Custom OpenAPI schema generator ensuring array file uploads have format: binary."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )
+    for schema_val in openapi_schema.get("components", {}).get("schemas", {}).values():
+        props = schema_val.get("properties", {})
+        if "files" in props and props["files"].get("type") == "array":
+            items = props["files"].setdefault("items", {})
+            items["type"] = "string"
+            items["format"] = "binary"
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
 class QueryRequest(BaseModel):
@@ -104,7 +140,7 @@ def reset_endpoint() -> dict[str, Any]:
 @app.post("/documents", status_code=status.HTTP_201_CREATED, tags=["Documents"])
 async def upload_documents(
     files: Annotated[
-        list[UploadFile],
+        list[PDFUploadFile],
         File(description="One or more PDF document files to upload and ingest"),
     ],
 ) -> dict[str, Any]:
@@ -142,8 +178,7 @@ async def upload_documents(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"File '{filename}' is not a valid PDF document. "
-                    "Only .pdf files are supported."
+                    f"File '{filename}' is not a valid PDF document. Only .pdf files are supported."
                 ),
             )
 
@@ -236,8 +271,6 @@ async def upload_documents(
                     os.remove(p)
                 except OSError:
                     pass
-
-
 
 
 @app.get("/facts", tags=["Facts"])
