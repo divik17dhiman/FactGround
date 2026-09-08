@@ -104,16 +104,16 @@ def test_real_starter_document_corroboration() -> None:
 
     # Amortisation expense on page 36 of Annual Report (13.19%) vs page 17 of Q4 Earnings (13.2%)
     facts_ar = [
-        f for f in kb_ar.grounded_facts()
+        f
+        for f in kb_ar.grounded_facts()
         if "amortisation" in f.subject.lower()
         and f.page_number == 36
         and f.fact_type == "percentage"
     ]
     facts_q4 = [
-        f for f in kb_q4.grounded_facts()
-        if "amortisation" in f.subject.lower()
-        and f.page_number == 17
-        and "13.2" in f.raw_value
+        f
+        for f in kb_q4.grounded_facts()
+        if "amortisation" in f.subject.lower() and f.page_number == 17 and "13.2" in f.raw_value
     ]
 
     assert len(facts_ar) >= 1
@@ -123,4 +123,3 @@ def test_real_starter_document_corroboration() -> None:
     assert rel.state == CORROBORATED
     assert "13.19" in str(facts_ar[0].normalized_value)
     assert "13.2" in str(facts_q4[0].raw_value)
-

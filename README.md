@@ -1,91 +1,164 @@
-# Superjoin Fact Knowledge Layer
+# SuperJoin Fact Knowledge Layer
 
-## Project
+> **SuperJoin VIT 2026 Engineering Intern Hiring Assignment**  
+> *A deterministic, evidence-grounded Fact Knowledge Layer for financial and business documents.*
 
-The Superjoin Fact Knowledge Layer is a Python-based project designed to process arbitrary financial and business PDFs, extract meaningful numerical and semantic facts, preserve source evidence, and make those facts comparable across documents.
+---
 
-The goal is not to memorize a few sample reports, but to build a reusable system that can generalize to unseen PDFs while keeping every published fact grounded in verifiable evidence from the source document.
+## Video Demo Link
 
-## Problem
+> **Video Demo:** *To be added before submission.*
 
-Given an arbitrary financial or business PDF, the system must identify meaningful facts, preserve their provenance, normalize them into a consistent representation, and allow comparison and explanation without silently inventing missing details.
+---
 
-This is a difficult challenge because real-world documents vary in structure, terminology, formatting, and quality. The architecture therefore needs to separate document parsing, fact detection, normalization, evidence grounding, validation, and structured output.
+## Project Overview
 
-## Goals
+The **SuperJoin Fact Knowledge Layer** is an extensible Python application designed to ingest arbitrary financial and business PDFs, extract structured numerical and semantic facts, validate them strictly against source page evidence, query them deterministically without hallucination, and classify cross-fact relationships across documents.
 
-- PDF ingestion for heterogeneous business and financial documents
-- numerical fact extraction and validation
-- semantic fact extraction from narrative and tabular content
-- evidence grounding to source text and page-level provenance
-- structured fact representation for comparison and explanation
-- robustness to unseen PDFs rather than hardcoded sample behavior
-- reproducible evaluation and auditability of extracted facts
+The core design philosophy is **evidence-first and deterministic**:
+- Every published answer is grounded in verbatim page text and provenance metadata (document ID, page number).
+- Ambiguous queries or ungrounded claims result in explicit refusal rather than generative invention.
+- Cross-fact comparison deterministically categorizes relationships into **CORROBORATED**, **CONTRADICTED**, **CONTEXTUALLY_RECONCILED**, **UNCERTAIN**, and **INCOMPARABLE**.
+- Fully operational on fresh checkouts with standard Python and PyMuPDF (no proprietary LLM APIs, vector databases, or complex external dependencies required).
 
-## Current Status
+---
 
-This repository is in:
+## Setup and Run Instructions
 
-**Phase 6 — End-to-End Evaluator Workflow & Usability Integration**
+### Prerequisites
+- Python 3.11, 3.12, 3.13, or 3.14
+- Virtual environment tool (`venv`)
 
-Phase 6 integrates the entire pipeline into a clean, evaluator-facing end-to-end workflow:
-- High-level public workflow: `build_knowledge_base(pdf_paths)` and `query(knowledge_base, question)`
-- Single and multi-document knowledge base aggregation with preserved source document provenance
-- Stable structured result representation (`QueryResult.to_dict()`, `.is_grounded`, `.top_fact`, and evidence list)
-- Command-line interface (`superjoin` or `python -m superjoin_fact_knowledge`) supporting human-readable and `--json` structured output
-- 58 passing tests covering unit parsing, integration workflows, multi-document querying, real PDF evaluation, and CLI execution
-
-## Quick Start for Evaluators
-
-### 1. Installation
+### Installation
 
 From a fresh checkout of the repository:
 
 ```bash
-# Create virtual environment
+# 1. Create virtual environment
 python -m venv .venv
 
-# Activate (Linux/macOS)
+# 2. Activate virtual environment
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# Linux / macOS:
 source .venv/bin/activate
 
-# Activate (Windows PowerShell)
-.\.venv\Scripts\Activate.ps1
-
-# Install package with development tools
+# 3. Upgrade pip and install package with development & API dependencies
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-### 2. Evaluator Python Workflow
+---
 
-```python
-from superjoin_fact_knowledge import build_knowledge_base, query
+### Running the Evaluator HTTP API
 
-# 1. Build knowledge base from one or multiple PDFs
-# Ingestion -> Fact Extraction -> Evidence Validation -> In-Memory Knowledge Base
-kb = build_knowledge_base("report.pdf")
-# Or multi-document:
-# kb = build_knowledge_base(["report1.pdf", "report2.pdf"])
+The application exposes a complete REST API powered by FastAPI for uploading PDFs, inspecting facts, querying evidence, and evaluating cross-document relationships.
 
-# 2. Query with natural language or keywords
-result = query(kb, "operating margin in FY2024")
+#### 1. Start the API Server
 
-# 3. Inspect grounded answer
-if result.is_grounded:
-    print("Answer:", result.answer_text)
-    print("Document:", result.top_fact.document_name)
-    print("Page:", result.top_fact.page_number)
-    print("Evidence:", result.top_fact.evidence_text)
-else:
-    print("Status:", result.status)  # 'ambiguous' or 'no_grounded_answer'
+```bash
+# Using uvicorn directly:
+uvicorn superjoin_fact_knowledge.api:app --host 127.0.0.1 --port 8000 --reload
 
-# 4. Access full structured serialization
-structured_data = result.to_dict()
-print(structured_data)
+# Or via Python module:
+python -m uvicorn superjoin_fact_knowledge.api:app --port 8000
 ```
 
-### 3. Command-Line Interface (CLI)
+Once running, interactive **Swagger / OpenAPI documentation** is available at:
+`http://localhost:8000/docs`
 
-The package provides a built-in CLI via `superjoin` or `python -m superjoin_fact_knowledge`:
+#### 2. Upload and Ingest PDFs (`POST /documents`)
+
+Upload one or more PDF files to ingest, extract, and ground facts:
+
+```bash
+# Upload a single document:
+curl -X POST "http://localhost:8000/documents" \
+  -F "files=@report.pdf"
+
+# Upload multiple documents simultaneously:
+curl -X POST "http://localhost:8000/documents" \
+  -F "files=@doc_a.pdf" \
+  -F "files=@doc_b.pdf"
+```
+
+*Response (201 Created):*
+```json
+{
+  "message": "Successfully processed 1 document(s).",
+  "documents": [
+    {
+      "document_name": "report.pdf",
+      "facts_extracted": 42,
+      "grounded_facts": 42,
+      "review_facts": 0
+    }
+  ],
+  "total_facts_in_kb": 42,
+  "grounded_facts_in_kb": 42
+}
+```
+
+#### 3. Query Grounded Facts (`POST /query`)
+
+```bash
+curl -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "revenue in FY2024", "limit": 5}'
+```
+
+*Response:*
+```json
+{
+  "query": "revenue in FY2024",
+  "status": "answer_found",
+  "is_grounded": true,
+  "answer": "Example Company revenue was $10.5 million.",
+  "explanation": "subject_token_overlap:revenue; year_match:2024; grounded_fact",
+  "matches": [...],
+  "evidence": [
+    {
+      "document": "report.pdf",
+      "page": 1,
+      "text": "Example Company reported revenue of $10.5 million in FY2024.",
+      "raw_value": "$10.5 million",
+      "normalized_value": 10500000.0,
+      "unit": "currency"
+    }
+  ]
+}
+```
+
+#### 4. Inspect Facts (`GET /facts`)
+
+```bash
+# Retrieve all facts (with pagination)
+curl "http://localhost:8000/facts?limit=10&offset=0"
+
+# Filter by status or fact type
+curl "http://localhost:8000/facts?status=grounded&fact_type=currency"
+```
+
+#### 5. Inspect Cross-Fact Relationships (`GET /relationships`)
+
+```bash
+# Evaluate pairwise relationships in the KnowledgeBase
+curl "http://localhost:8000/relationships?limit=20"
+
+# Compare two specific facts by ID:
+curl "http://localhost:8000/relationships?fact_a_id=<ID_A>&fact_b_id=<ID_B>"
+
+# Or via POST:
+curl -X POST "http://localhost:8000/relationships/compare" \
+  -H "Content-Type: application/json" \
+  -d '{"fact_a_id": "<ID_A>", "fact_b_id": "<ID_B>"}'
+```
+
+---
+
+### Running the Command-Line Interface (CLI)
+
+The package provides a fast CLI via `superjoin` or `python -m superjoin_fact_knowledge`:
 
 **Human-Readable Terminal Output:**
 ```bash
@@ -99,182 +172,151 @@ python -m superjoin_fact_knowledge report.pdf -q "revenue in FY2024" --json
 
 **Multi-Document Querying:**
 ```bash
-python -m superjoin_fact_knowledge doc1.pdf doc2.pdf -q "total shipments"
+python -m superjoin_fact_knowledge doc1.pdf doc2.pdf -q "operating margin"
 ```
 
-### 4. Structured Output Contract
+---
 
-Query results return structured objects with `.to_dict()` serialization:
-
-```json
-{
-  "query": "operating margin in FY2024",
-  "status": "answer_found",
-  "is_grounded": true,
-  "answer": "Operating margin was 21.5%.",
-  "explanation": "subject_phrase_match; year_match:2024; grounded_fact",
-  "matches": [
-    {
-      "score": 18.5,
-      "reasons": ["subject_phrase_match", "year_match:2024", "grounded_fact"],
-      "fact": {
-        "fact_id": "8f3a...",
-        "subject": "Operating margin",
-        "fact_type": "percentage",
-        "raw_value": "21.5%",
-        "normalized_value": 21.5,
-        "unit": "percent",
-        "metric": "percentage",
-        "evidence": "Operating margin improved to 21.5% in FY2024.",
-        "page": 3,
-        "document": "report.pdf",
-        "document_id": "e4b1...",
-        "confidence": 1.0,
-        "status": "grounded"
-      }
-    }
-  ],
-  "evidence": [
-    {
-      "document": "report.pdf",
-      "page": 3,
-      "text": "Operating margin improved to 21.5% in FY2024.",
-      "raw_value": "21.5%",
-      "normalized_value": 21.5,
-      "unit": "percent"
-    }
-  ]
-}
-```
-
-### 5. Modular Low-Level APIs
-
-For granular pipeline access:
+### Python Library Usage
 
 ```python
-from superjoin_fact_knowledge import extract_facts, ingest_pdf, validate_facts, KnowledgeBase
+from superjoin_fact_knowledge import build_knowledge_base, query, compare_facts
 
-doc = ingest_pdf("report.pdf")
-facts = extract_facts(doc)
-validated_facts = validate_facts(facts, doc)
-kb = KnowledgeBase.from_facts(validated_facts)
-result = kb.query("revenue")
+# 1. Build knowledge base from single or multiple PDFs
+kb = build_knowledge_base(["filing_2023.pdf", "filing_2024.pdf"])
+
+# 2. Query knowledge base
+result = query(kb, "operating profit in FY2024")
+
+if result.is_grounded:
+    print(f"Answer: {result.answer_text}")
+    print(f"Document: {result.top_fact.document_name}, Page: {result.top_fact.page_number}")
+    print(f"Evidence: {result.top_fact.evidence_text}")
+else:
+    print(f"Refusal status: {result.status}")
+
+# 3. Compare facts across documents
+facts = kb.grounded_facts()
+if len(facts) >= 2:
+    relationship = compare_facts(facts[0], facts[1])
+    print("Relationship:", relationship.state)
+    print("Explanation:", relationship.explanation)
 ```
 
-### 6. Cross-Fact Relationship Reasoning
+---
 
-Compare facts across documents to determine whether they corroborate, contradict, or contextually reconcile:
+## Required Evaluation Cases
 
-```python
-from superjoin_fact_knowledge import compare_facts
+The assignment specification explicitly mandates demonstration of four core evaluation cases. These are fully implemented and verified via automated test fixtures:
 
-# Compare two facts deterministically
-rel = compare_facts(fact_1, fact_2)
-print("Relationship State:", rel.state)
-# Outputs: 'CORROBORATED', 'CONTRADICTED', 'CONTEXTUALLY_RECONCILED', 'INCOMPARABLE', or 'UNCERTAIN'
-print("Explanation:", rel.explanation)
+| Case | Category | Input Documents | Evaluated State | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **Case 1** | **Corroboration** | `filing_doc_a.pdf`, `press_release_doc_b.pdf` | `CORROBORATED` | **PASS** |
+| **Case 2** | **Contradiction** | `official_filing.pdf`, `analyst_estimate.pdf` | `CONTRADICTED` | **PASS** |
+| **Case 3** | **Contextual Reconciliation** | `annual_report_fy23.pdf`, `annual_report_fy24.pdf` | `CONTEXTUALLY_RECONCILED` | **PASS** |
+| **Case 4** | **Extraction Failure & Refusal** | `scanned_receipt_image_only.pdf` | `no_grounded_answer` | **PASS** |
+
+### Running the Demonstrations
+
+To execute all four cases interactively and view the detailed evaluation breakdown:
+
+```bash
+python examples/run_demonstrations.py
 ```
 
-## Architecture
+To run the automated pytest verification suite covering all four cases:
 
-The current pipeline follows this flow:
+```bash
+pytest tests/test_evaluation_demonstrations.py -v
+```
+
+For complete analysis and source evidence records for each case, see:
+- [docs/evaluation-cases.md](docs/evaluation-cases.md)
+- [examples/README.md](examples/README.md)
+- [examples/corroboration/](examples/corroboration/)
+- [examples/contradiction/](examples/contradiction/)
+- [examples/contextual_reconciliation/](examples/contextual_reconciliation/)
+- [examples/extraction_failure/](examples/extraction_failure/)
+
+---
+
+## Approach & Architectural Design
+
+The pipeline follows a clean, modular architectural progression where each stage has a distinct, independently testable responsibility:
 
 ```text
-PDF file
-  ↓
-PyMuPDF adapter
-  ↓
-Document
-  ↓
-Page[]
-  ↓
-Deterministic fact extraction
-  ↓
-Structured Facts
-  ↓
-Evidence validation
-  ↓
-Grounded facts with provenance
+PDF File(s)
+    ↓
+[Ingestion Layer] (PyMuPDF adapter)
+    ↓
+Document & Page[] Representation (provenance + page diagnostics)
+    ↓
+[Fact Extraction Layer] (Deterministic regexes: currency, %, quantities, dates, scales)
+    ↓
+Candidate Facts
+    ↓
+[Validation & Grounding Layer] (Source text presence, raw presence, normalization checks)
+    ↓
+Grounded Facts (with Document ID, Document Name, Page Number, Evidence Snippet)
+    ↓
+[KnowledgeBase] (In-memory aggregation, multi-document support)
+    ↓
+[Deterministic Query Engine] (Token scoring, subject matching, unit/period alignment)
+    ↓
+QueryResult (Answer, Grounding Invariant, Matches, Evidence Provenance)
+    ↓
+[Relationship Reasoning Engine] (compare_facts: CORROBORATED, CONTRADICTED, RECONCILED)
+    ↓
+Evaluator Interfaces (REST API, CLI, Python Library)
 ```
 
-The fact model keeps both the raw value as it appeared in the PDF and any normalized internal representation, while retaining the page number and evidence text needed for later validation and grounding. Validation does not replace the raw source representation; it only records whether the evidence is strong enough to treat the fact as grounded.
+### Why the System Does Not Require an LLM
+The assignment allows any framework, library, or model, but explicitly emphasizes deterministic engineering and hallucination prevention. The current architecture deliberately avoids speculative LLM integration because:
+1. **Verifiability:** Deterministic regexes, normalization routines, and mathematical tolerance checks produce 100% explainable results with exact line/page references.
+2. **Zero Hallucination:** If evidence is missing, ambiguous, or ungrounded, the system guarantees an explicit refusal (`no_grounded_answer` or `ambiguous`), whereas generative models risk inventing plausible numbers.
+3. **Reproducibility & Zero Cost:** Evaluators can run the entire test suite and API locally without API keys, token budgets, network dependencies, or nondeterministic temperature drift.
 
-## Grounded Facts
+### Core Invariant: Grounded Query Results
+An answer is only presented as grounded if it satisfies:
+```python
+result.is_grounded == (
+    result.status == "answer_found"
+    and result.top_fact is not None
+    and result.top_fact.status == "grounded"
+)
+```
+Facts marked as `needs_review` are quarantined and can never be promoted to an authoritative answer.
 
-A grounded fact answers four questions without losing source traceability:
+---
 
-- What value was extracted?
-- How was it normalized?
-- Which page did it come from?
-- What source evidence supports it?
+## Limitations and Next Steps
 
-In this repository, a fact is considered grounded when the document exists, the page number is valid, the evidence text is present, the evidence contains the extracted value or an equivalent representation, and the normalized value is consistent with the raw source text.
+1. **Scanned & Image-Only PDFs**:
+   - *Current Behavior*: Non-text pages are detected via `Page.has_extractable_text == False` and yield zero facts. Queries safely refuse with `no_grounded_answer`.
+   - *Next Step*: Add an optional OCR plugin (e.g. Tesseract) behind the ingestion interface for image-only pages.
+2. **Complex Table Grid Reconstruction**:
+   - *Current Behavior*: Tables are parsed via PyMuPDF text streams. Cell token order is preserved, but borderless tables lacking text spacing rely on nearby sentence context.
+   - *Next Step*: Integrate a layout-aware table parser (e.g. `pdfplumber` or `camelot`) to construct explicit row-column coordinate matrices.
+3. **Unanchored Qualitative Narrative**:
+   - *Current Behavior*: Facts are extracted when anchored to quantitative metrics, currencies, percentages, or dates. Pure qualitative narrative statements ("company maintained strong market reputation") are omitted.
+   - *Next Step*: Introduce a targeted semantic NLP extractor for non-numeric corporate claims.
+4. **State Persistence**:
+   - *Current Behavior*: The HTTP API maintains an in-memory `KnowledgeBase` instance during the server process lifecycle.
+   - *Next Step*: Add an optional SQLite persistence backend for saving and loading knowledge bases across server restarts.
 
-Validated facts surface grounding state through `status` and validation diagnostics in metadata. Facts that fail validation are not discarded; they are marked for review instead.
+---
 
-The Phase 4 knowledge layer treats grounded facts as authoritative candidates and keeps `needs_review` facts out of default answer selection. Review facts remain queryable for inspection, but they are never silently promoted to grounded answers.
+## Additional Evaluator Notes
 
-## Development
-
-This project uses a lightweight Python toolchain with `pytest` for tests and `ruff` for formatting and linting.
-
-### Create and activate a virtual environment
+- **Starter Dataset Independence**: The implementation contains zero hardcoded company names, numbers, or starter filenames. It executes identically on arbitrary unseen business reports.
+- **Cross-Document Provenance**: Multi-document ingestion (`build_knowledge_base([pdf1, pdf2])`) preserves the distinct originating document name and SHA-256 identifier for every fact.
+- **Robust Test Coverage**: The project includes 71+ unit, integration, CLI, API, real starter document, and evaluation demonstration tests.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-```
+# Run the complete test suite:
+pytest -v
 
-On Windows PowerShell:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-### Install dependencies
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-### Run tests
-
-```bash
-pytest
-```
-
-### Lint the project
-
-```bash
+# Run lint and format checks:
 ruff check .
+ruff format --check .
 ```
-
-### Format the project
-
-```bash
-ruff format .
-```
-
-## Repository Structure
-
-- `src/` — source package for the project implementation
-- `tests/` — project smoke tests and future validation tests
-- `docs/` — architecture and design documentation
-- `.github/` — repository workflow and Copilot guidance
-- `starter-datasets/` — assignment reference datasets that are treated as fixtures rather than templates
-- `README.md` — project overview and local development workflow
-
-## Notes
-
-This repository is intentionally being structured as a production-quality foundation rather than a collection of ad hoc scripts. The objective is to create a clean engineering baseline suitable for future implementation work while preserving the assignment's requirement to remain generalizable across unseen PDFs.
-
-## Scope and Limitations
-
-- **Tables**: Table text is extracted via page text streams; multi-column cell-to-header relationships in complex borderless tables without layout cues are not parsed into structured grids.
-- **Charts and Graphs**: Text elements (labels, legends, titles) are extracted from page text streams; graphical vector/raster curve interpretation is not parsed via computer vision.
-- **Scanned / Image-Only PDFs**: Non-text pages are detected through diagnostics (`has_extractable_text=False`); OCR binary engines (e.g. Tesseract) are not bundled to ensure zero external system dependencies on fresh checkout.
-- **Derived Calculations**: The system retrieves stated factual values directly; speculative arithmetic formulas or derived answers are not computed dynamically to avoid hallucination.
-- **Semantic Facts**: Structured entities and qualifiers associated with values are extracted deterministically; open-ended qualitative narrative claims without metrics or dates are reserved for future LLM phases.
-- **Sentence-Level Provenance**: Evidence grounding is established at sentence and page level; bounding-box span coordinates are preserved in metadata when provided by the ingestion layer.
