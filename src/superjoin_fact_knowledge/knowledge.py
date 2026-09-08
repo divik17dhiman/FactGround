@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from typing import Any
 
 from .fact import Fact
 
@@ -41,6 +42,14 @@ class QueryMatch:
     score: float
     reasons: tuple[str, ...] = ()
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize candidate match to a structured dictionary."""
+        return {
+            "score": self.score,
+            "reasons": list(self.reasons),
+            "fact": self.fact.to_dict(),
+        }
+
 
 @dataclass(slots=True, frozen=True)
 class QueryResult:
@@ -52,6 +61,39 @@ class QueryResult:
     review_matches: tuple[QueryMatch, ...] = ()
     answer_text: str | None = None
     explanation: str = ""
+
+    @property
+    def is_grounded(self) -> bool:
+        """Return True if an unambiguous grounded answer was found."""
+        return self.status == "answer_found"
+
+    @property
+    def top_fact(self) -> Fact | None:
+        """Return the top matching grounded fact if present."""
+        return self.matches[0].fact if self.matches else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize query result to a clean evaluator-facing dictionary."""
+        return {
+            "query": self.query,
+            "status": self.status,
+            "is_grounded": self.is_grounded,
+            "answer": self.answer_text,
+            "explanation": self.explanation,
+            "matches": [match.to_dict() for match in self.matches],
+            "review_matches": [match.to_dict() for match in self.review_matches],
+            "evidence": [
+                {
+                    "document": match.fact.document_name,
+                    "page": match.fact.page_number,
+                    "text": match.fact.evidence_text,
+                    "raw_value": match.fact.raw_value,
+                    "normalized_value": match.fact.normalized_value,
+                    "unit": match.fact.unit,
+                }
+                for match in self.matches
+            ],
+        }
 
 
 def _clone_fact(fact: Fact) -> Fact:
@@ -262,6 +304,16 @@ def query_facts(
     include_needs_review: bool = False,
 ) -> QueryResult:
     """Query grounded facts and preserve their provenance in a structured result."""
+    if not query or not query.strip():
+        return QueryResult(
+            query=query,
+            status="no_grounded_answer",
+            matches=(),
+            review_matches=(),
+            answer_text=None,
+            explanation="Empty query string provided",
+        )
+
     grounded_candidates = _rank_facts(knowledge_base.grounded_facts(), query)
     review_candidates = _rank_facts(knowledge_base.review_facts(), query)
 
@@ -270,7 +322,12 @@ def query_facts(
 
     selected_match = _best_grounded_match(grounded_matches)
 
-    if grounded_matches and grounded_matches[0].score > 0:
+    has_query_relevance = any(
+        r not in ("grounded_fact", "needs_review_fact")
+        for r in (grounded_matches[0].reasons if grounded_matches else ())
+    )
+
+    if grounded_matches and has_query_relevance:
         top_match = grounded_matches[0]
         if len(grounded_matches) > 1 and grounded_matches[1].score == top_match.score:
             return QueryResult(

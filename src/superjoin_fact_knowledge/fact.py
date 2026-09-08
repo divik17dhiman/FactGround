@@ -207,6 +207,25 @@ class Fact:
             metadata=metadata or {},
         )
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize fact to a structured dictionary representation."""
+        return {
+            "fact_id": self.fact_id,
+            "subject": self.subject,
+            "fact_type": self.fact_type,
+            "raw_value": self.raw_value,
+            "normalized_value": self.normalized_value,
+            "unit": self.unit,
+            "metric": self.metric,
+            "evidence": self.evidence_text,
+            "page": self.page_number,
+            "document": self.document_name,
+            "document_id": self.document_id,
+            "confidence": self.confidence,
+            "status": self.status,
+            "metadata": dict(self.metadata),
+        }
+
 
 def _normalize_number(raw: str) -> float:
     """Turn a number string into a float."""
