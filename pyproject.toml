@@ -38,6 +38,9 @@ dev = [
     "ruff>=0.6.0",
 ]
 
+[project.scripts]
+superjoin = "superjoin_fact_knowledge.cli:main"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 
