@@ -69,17 +69,12 @@ Once running, interactive **Swagger / OpenAPI documentation** is available at:
 
 #### 2. Upload and Ingest PDFs (`POST /documents`)
 
-Upload one or more PDF files to ingest, extract, and ground facts:
+Upload a PDF file to ingest, extract, and ground facts:
 
 ```bash
-# Upload a single document:
+# Upload a document:
 curl -X POST "http://localhost:8000/documents" \
-  -F "files=@report.pdf"
-
-# Upload multiple documents simultaneously:
-curl -X POST "http://localhost:8000/documents" \
-  -F "files=@doc_a.pdf" \
-  -F "files=@doc_b.pdf"
+  -F "file=@report.pdf"
 ```
 
 *Response (201 Created):*

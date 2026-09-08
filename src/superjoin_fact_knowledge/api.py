@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import os
 import tempfile
+from dataclasses import replace
 from typing import Annotated, Any
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
-from .fact import Fact
 from .ingestion import PDFIngestionError
 from .knowledge import KnowledgeBase
 from .relationship import (
@@ -101,111 +101,99 @@ def reset_endpoint() -> dict[str, Any]:
 
 
 @app.post("/documents", status_code=status.HTTP_201_CREATED, tags=["Documents"])
-async def upload_documents(
-    files: Annotated[list[UploadFile], File(...)],
+async def upload_document(
+    file: Annotated[UploadFile, File(description="PDF document file to upload and ingest")],
 ) -> dict[str, Any]:
-    """Upload one or more PDF files and ingest their facts into the KnowledgeBase.
+    """Upload a PDF file and ingest its facts into the KnowledgeBase.
 
     Validates:
-    - Non-empty file list
-    - PDF extension / content validation
-    - Non-empty payload
+    - File is provided and non-empty
+    - File has a .pdf extension
+    - Content is a valid, readable PDF document
 
-    Invokes the deterministic ingestion, extraction, and validation pipeline.
+    Adapts the uploaded file to the existing path-based workflow while
+    preserving the original uploaded filename as document provenance.
     """
     global _kb
 
-    if not files:
+    filename = file.filename or ""
+    if not filename or not filename.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No files provided in upload request.",
+            detail="No file provided or missing filename in upload request.",
         )
 
-    processed_docs: list[dict[str, Any]] = []
-    temp_paths: list[str] = []
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File '{filename}' is not a valid PDF document. Only .pdf files are supported.",
+        )
 
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File '{filename}' is empty.",
+        )
+
+    # Safely create server-side temporary file for ingestion
+    fd, temp_path = tempfile.mkstemp(suffix=".pdf")
     try:
-        for file in files:
-            filename = file.filename or "unknown.pdf"
-            if not filename.lower().endswith(".pdf"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"File '{filename}' is not a valid PDF document.",
-                )
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
 
-            content = await file.read()
-            if not content:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"File '{filename}' is empty.",
-                )
+        try:
+            # Pass server-side path to existing workflow
+            new_kb = build_knowledge_base(temp_path)
+        except PDFIngestionError as exc:
+            # Clean error message without leaking server-side temporary paths or stack traces
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Failed to ingest PDF '{filename}': "
+                    "Document is malformed, corrupted, or not a readable PDF."
+                ),
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to process document '{filename}'.",
+            ) from exc
 
-            # Write temporary file for PyMuPDF ingestion
-            fd, temp_path = tempfile.mkstemp(suffix=".pdf")
-            with os.fdopen(fd, "wb") as f:
-                f.write(content)
-            temp_paths.append(temp_path)
+        # Fix document_name on extracted facts to preserve original uploaded filename provenance
+        renamed_facts = [
+            replace(fact, document_name=filename)
+            if fact.document_name != filename
+            else fact
+            for fact in new_kb.facts
+        ]
 
-            try:
-                # Ingest document and extract facts
-                new_kb = build_knowledge_base(temp_path)
+        _kb = _kb.add_facts(renamed_facts)
 
-                # Fix document_name on extracted facts to preserve original uploaded filename
-                renamed_facts = [
-                    fact
-                    if fact.document_name == filename
-                    else Fact(
-                        fact_id=fact.fact_id,
-                        subject=fact.subject,
-                        fact_type=fact.fact_type,
-                        raw_value=fact.raw_value,
-                        normalized_value=fact.normalized_value,
-                        unit=fact.unit,
-                        metric=fact.metric,
-                        evidence_text=fact.evidence_text,
-                        page_number=fact.page_number,
-                        document_id=fact.document_id,
-                        document_name=filename,
-                        confidence=fact.confidence,
-                        status=fact.status,
-                        metadata=dict(fact.metadata),
-                    )
-                    for fact in new_kb.facts
-                ]
-
-                _kb = _kb.add_facts(renamed_facts)
-
-                grounded_count = sum(1 for f in renamed_facts if f.status == "grounded")
-                review_count = len(renamed_facts) - grounded_count
-
-                processed_docs.append(
-                    {
-                        "document_name": filename,
-                        "facts_extracted": len(renamed_facts),
-                        "grounded_facts": grounded_count,
-                        "review_facts": review_count,
-                    }
-                )
-            except PDFIngestionError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Failed to ingest PDF '{filename}': {exc}",
-                ) from exc
+        grounded_count = sum(1 for f in renamed_facts if f.status == "grounded")
+        review_count = len(renamed_facts) - grounded_count
 
         return {
-            "message": f"Successfully processed {len(processed_docs)} document(s).",
-            "documents": processed_docs,
+            "message": "Successfully processed 1 document(s).",
+            "documents": [
+                {
+                    "document_name": filename,
+                    "facts_extracted": len(renamed_facts),
+                    "grounded_facts": grounded_count,
+                    "review_facts": review_count,
+                }
+            ],
             "total_facts_in_kb": len(_kb.facts),
             "grounded_facts_in_kb": len(_kb.grounded_facts()),
         }
 
     finally:
-        for p in temp_paths:
-            if os.path.exists(p):
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
 
 
 @app.get("/facts", tags=["Facts"])
