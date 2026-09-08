@@ -1,5 +1,6 @@
 """Superjoin Fact Knowledge Layer package."""
 
+from .api import app
 from .document import Document, DocumentDiagnostics, Page, PageDiagnostic
 from .fact import Fact, extract_facts, validate_fact, validate_facts
 from .ingestion import PDFIngestionError, ingest_pdf
@@ -32,6 +33,7 @@ __all__ = [
     "QueryResult",
     "UNCERTAIN",
     "__version__",
+    "app",
     "build_knowledge_base",
     "compare_facts",
     "extract_facts",

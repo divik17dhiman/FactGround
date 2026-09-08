@@ -30,16 +30,21 @@ classifiers = [
 ]
 dependencies = [
     "PyMuPDF>=1.24.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.0",
     "ruff>=0.6.0",
+    "httpx>=0.24.0",
 ]
 
 [project.scripts]
 superjoin = "superjoin_fact_knowledge.cli:main"
+superjoin-api = "superjoin_fact_knowledge.api:app"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
