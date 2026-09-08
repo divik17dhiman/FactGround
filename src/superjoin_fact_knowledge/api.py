@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import tempfile
 from dataclasses import replace
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
@@ -101,98 +102,141 @@ def reset_endpoint() -> dict[str, Any]:
 
 
 @app.post("/documents", status_code=status.HTTP_201_CREATED, tags=["Documents"])
-async def upload_document(
-    file: Annotated[UploadFile, File(description="PDF document file to upload and ingest")],
+async def upload_documents(
+    files: Annotated[
+        list[UploadFile],
+        File(description="One or more PDF document files to upload and ingest"),
+    ],
 ) -> dict[str, Any]:
-    """Upload a PDF file and ingest its facts into the KnowledgeBase.
+    """Upload one or more PDF files and ingest their facts into the KnowledgeBase.
 
     Validates:
-    - File is provided and non-empty
-    - File has a .pdf extension
-    - Content is a valid, readable PDF document
+    - Non-empty file list
+    - Every file has a non-empty filename with .pdf extension
+    - Every file contains non-empty content
+    - PDF contents are valid and readable
 
-    Adapts the uploaded file to the existing path-based workflow while
-    preserving the original uploaded filename as document provenance.
+    Adapts the uploaded files into temporary paths, passes them as a batch to the
+    existing path-based workflow, preserves original filenames for provenance, and
+    cleans up all temporary files safely.
     """
     global _kb
 
-    filename = file.filename or ""
-    if not filename or not filename.strip():
+    if not files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No file provided or missing filename in upload request.",
+            detail="No files provided in upload request.",
         )
 
-    if not filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File '{filename}' is not a valid PDF document. Only .pdf files are supported.",
-        )
+    # 1. Validate every upload before any processing or temporary file creation
+    file_contents: list[tuple[str, bytes]] = []
+    for file in files:
+        filename = file.filename or ""
+        if not filename or not filename.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing filename in upload request.",
+            )
 
-    content = await file.read()
-    if not content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File '{filename}' is empty.",
-        )
+        if not filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"File '{filename}' is not a valid PDF document. "
+                    "Only .pdf files are supported."
+                ),
+            )
 
-    # Safely create server-side temporary file for ingestion
-    fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+        content = await file.read()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File '{filename}' is empty.",
+            )
+        file_contents.append((filename, content))
+
+    # 2. Safely create temporary files for all valid PDFs
+    temp_paths: list[str] = []
+    temp_to_orig: dict[str, str] = {}
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(content)
+        for filename, content in file_contents:
+            fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+            with os.fdopen(fd, "wb") as f:
+                f.write(content)
+            temp_paths.append(temp_path)
+            # Map both basename and full path to the original filename
+            temp_to_orig[Path(temp_path).name] = filename
+            temp_to_orig[temp_path] = filename
 
+        # 3. Process the complete upload set as one logical ingestion operation
         try:
-            # Pass server-side path to existing workflow
-            new_kb = build_knowledge_base(temp_path)
+            new_kb = build_knowledge_base(temp_paths)
         except PDFIngestionError as exc:
-            # Clean error message without leaking server-side temporary paths or stack traces
+            # Map temporary path back to original filename if present in exception
+            failed_name = None
+            for p, orig in temp_to_orig.items():
+                if p in str(exc):
+                    failed_name = orig
+                    break
+            detail = (
+                f"Failed to ingest PDF '{failed_name}': "
+                "Document is malformed, corrupted, or not a readable PDF."
+                if failed_name
+                else (
+                    "Failed to ingest uploaded document(s): "
+                    "One or more PDF files are malformed, corrupted, or not readable."
+                )
+            )
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Failed to ingest PDF '{filename}': "
-                    "Document is malformed, corrupted, or not a readable PDF."
-                ),
+                detail=detail,
             ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to process document '{filename}'.",
+                detail="Failed to process uploaded documents.",
             ) from exc
 
-        # Fix document_name on extracted facts to preserve original uploaded filename provenance
+        # 4. Preserve original uploaded filenames in fact provenance
         renamed_facts = [
-            replace(fact, document_name=filename)
-            if fact.document_name != filename
+            replace(fact, document_name=temp_to_orig.get(fact.document_name, fact.document_name))
+            if fact.document_name in temp_to_orig
             else fact
             for fact in new_kb.facts
         ]
 
         _kb = _kb.add_facts(renamed_facts)
 
-        grounded_count = sum(1 for f in renamed_facts if f.status == "grounded")
-        review_count = len(renamed_facts) - grounded_count
-
-        return {
-            "message": "Successfully processed 1 document(s).",
-            "documents": [
+        # 5. Build structured per-document response
+        processed_docs: list[dict[str, Any]] = []
+        for filename, _ in file_contents:
+            doc_facts = [f for f in renamed_facts if f.document_name == filename]
+            grounded_count = sum(1 for f in doc_facts if f.status == "grounded")
+            review_count = len(doc_facts) - grounded_count
+            processed_docs.append(
                 {
                     "document_name": filename,
-                    "facts_extracted": len(renamed_facts),
+                    "facts_extracted": len(doc_facts),
                     "grounded_facts": grounded_count,
                     "review_facts": review_count,
                 }
-            ],
+            )
+
+        return {
+            "message": f"Successfully processed {len(processed_docs)} document(s).",
+            "documents": processed_docs,
             "total_facts_in_kb": len(_kb.facts),
             "grounded_facts_in_kb": len(_kb.grounded_facts()),
         }
 
     finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
+        for p in temp_paths:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
 
 
 

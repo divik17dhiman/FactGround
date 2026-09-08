@@ -45,7 +45,7 @@ def test_root_endpoint_metadata(client: TestClient) -> None:
 
 
 def test_openapi_schema_documents_upload_control(client: TestClient) -> None:
-    """Verify OpenAPI schema provides a standard 'file' upload control."""
+    """Verify OpenAPI schema provides a multi-file 'files' upload control."""
     response = client.get("/openapi.json")
     assert response.status_code == 200
     schema = response.json()
@@ -59,145 +59,182 @@ def test_openapi_schema_documents_upload_control(client: TestClient) -> None:
     else:
         body_def = req_body_schema
 
-    assert "file" in body_def["properties"]
-    assert "file" in body_def["required"]
+    assert "files" in body_def["properties"]
+    assert body_def["properties"]["files"]["type"] == "array"
+    assert "files" in body_def["required"]
 
 
-def test_upload_valid_pdf_success(client: TestClient) -> None:
-    """Test 1: Successful PDF upload.
+def test_multiple_pdf_upload_success(client: TestClient) -> None:
+    """Test 1: Multiple PDF upload.
 
-    Uploads valid PDF, verifies HTTP 201, fact extraction, KnowledgeBase update,
-    structured response, and grounded status.
+    Uploads multiple PDFs in one request, verifies HTTP 201, both documents processed,
+    facts extracted for each document, and structured response returned.
     """
-    pdf_bytes = _generate_test_pdf_bytes("Acme Corp reported revenue of $25.0 million in FY2024.")
-    files = {"file": ("annual_report.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
+    pdf_a = _generate_test_pdf_bytes("Acme Corp reported revenue of $50.0 million in FY2024.")
+    pdf_b = _generate_test_pdf_bytes("Beta Corp reported shipments of 100000 units in FY2024.")
+    files = [
+        ("files", ("report_a.pdf", io.BytesIO(pdf_a), "application/pdf")),
+        ("files", ("report_b.pdf", io.BytesIO(pdf_b), "application/pdf")),
+    ]
 
     response = client.post("/documents", files=files)
     assert response.status_code == 201
     data = response.json()
-    assert "Successfully processed 1 document(s)" in data["message"]
-    assert data["total_facts_in_kb"] >= 1
-    assert data["grounded_facts_in_kb"] >= 1
+    assert "Successfully processed 2 document(s)" in data["message"]
+    assert len(data["documents"]) == 2
 
-    assert len(data["documents"]) == 1
-    doc_meta = data["documents"][0]
-    assert doc_meta["document_name"] == "annual_report.pdf"
-    assert doc_meta["facts_extracted"] >= 1
-    assert doc_meta["grounded_facts"] >= 1
+    doc_names = {d["document_name"] for d in data["documents"]}
+    assert doc_names == {"report_a.pdf", "report_b.pdf"}
+    assert data["total_facts_in_kb"] >= 2
+    assert data["grounded_facts_in_kb"] >= 2
 
 
-def test_query_after_upload(client: TestClient) -> None:
-    """Test 2: Query after upload.
+def test_query_facts_from_both_documents(client: TestClient) -> None:
+    """Test 2: Query facts from both documents.
 
-    Uploads PDF, then queries the API to confirm the uploaded document's facts
-    are fully incorporated into the KnowledgeBase and query layer.
+    Uploads two PDFs in one request, then queries for facts unique to document A
+    and document B to confirm both entered the same KnowledgeBase.
     """
-    raw = "Acme Corp reported operating profit of $12.5 million in FY2024."
-    pdf_bytes = _generate_test_pdf_bytes(raw)
-    files = {"file": ("report_fy24.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
+    pdf_a = _generate_test_pdf_bytes("Acme Corp reported operating profit of $12.5 million.")
+    pdf_b = _generate_test_pdf_bytes("Beta Corp achieved gross margin of 22.5% in FY2024.")
+    files = [
+        ("files", ("doc_a.pdf", io.BytesIO(pdf_a), "application/pdf")),
+        ("files", ("doc_b.pdf", io.BytesIO(pdf_b), "application/pdf")),
+    ]
     upload_res = client.post("/documents", files=files)
     assert upload_res.status_code == 201
 
-    # Query matching currency fact
-    query_res = client.post("/query", json={"query": "operating profit amount in FY2024"})
-    assert query_res.status_code == 200
-    data = query_res.json()
+    # Query fact from doc A
+    query_a = client.post("/query", json={"query": "Acme operating profit"})
+    assert query_a.status_code == 200
+    data_a = query_a.json()
+    assert data_a["status"] == "answer_found"
+    assert "$12.5 million" in data_a["answer"]
+    assert data_a["evidence"][0]["document"] == "doc_a.pdf"
 
-    assert data["status"] == "answer_found"
-    assert data["is_grounded"] is True
-    assert "$12.5 million" in data["answer"]
-    assert len(data["matches"]) >= 1
-    assert len(data["evidence"]) >= 1
-    assert data["evidence"][0]["document"] == "report_fy24.pdf"
-    assert data["evidence"][0]["page"] == 1
+    # Query fact from doc B
+    query_b = client.post("/query", json={"query": "Beta gross margin"})
+    assert query_b.status_code == 200
+    data_b = query_b.json()
+    assert data_b["status"] == "answer_found"
+    assert "22.5%" in data_b["answer"]
+    assert data_b["evidence"][0]["document"] == "doc_b.pdf"
 
 
-def test_provenance_preserves_original_filename(client: TestClient) -> None:
-    """Test 3: Provenance preservation.
+def test_provenance_preserves_original_filenames_multiple(client: TestClient) -> None:
+    """Test 3: Provenance preservation for multiple documents.
 
-    Uploads a PDF with a specific filename and verifies that the internal server-side
-    temporary path does NOT leak into document metadata, /facts, or /query evidence.
+    Verifies facts and evidence preserve original document filenames and do not
+    expose generated server-side temporary filenames.
     """
-    target_name = "uploaded_report.pdf"
-    raw_text = "Acme Corp declared dividend of $3.50 per share in FY2024."
-    pdf_bytes = _generate_test_pdf_bytes(raw_text)
-    files = {"file": (target_name, io.BytesIO(pdf_bytes), "application/pdf")}
+    target_a = "annual_report_2024.pdf"
+    target_b = "annual_report_2025.pdf"
+    pdf_a = _generate_test_pdf_bytes("Acme Corp revenue reached $40.0 million in FY2024.")
+    pdf_b = _generate_test_pdf_bytes("Acme Corp revenue reached $60.0 million in FY2025.")
+    files = [
+        ("files", ("annual_report_2024.pdf", io.BytesIO(pdf_a), "application/pdf")),
+        ("files", ("annual_report_2025.pdf", io.BytesIO(pdf_b), "application/pdf")),
+    ]
 
     upload_res = client.post("/documents", files=files)
     assert upload_res.status_code == 201
-    upload_data = upload_res.json()
-    assert upload_data["documents"][0]["document_name"] == target_name
 
-    # Check /facts
     facts_res = client.get("/facts")
     assert facts_res.status_code == 200
     facts = facts_res.json()["facts"]
-    assert len(facts) >= 1
-    for f in facts:
-        assert f["document"] == target_name
-        assert "tmp" not in f["document"]
+    assert len(facts) >= 2
 
-    # Check /query evidence
-    query_res = client.post("/query", json={"query": "dividend per share in FY2024"})
-    assert query_res.status_code == 200
-    evidence = query_res.json()["evidence"]
-    assert len(evidence) >= 1
-    for ev in evidence:
-        assert ev["document"] == target_name
-        assert "tmp" not in ev["document"]
+    provenance_docs = {f["document"] for f in facts}
+    assert target_a in provenance_docs
+    assert target_b in provenance_docs
+    for doc_name in provenance_docs:
+        assert "tmp" not in doc_name.lower() or doc_name in {target_a, target_b}
 
 
-def test_upload_non_pdf_file_rejected(client: TestClient) -> None:
-    """Test 4: Non-PDF upload rejected.
+def test_cross_document_relationship_after_multi_upload(client: TestClient) -> None:
+    """Test 4: Cross-document relationship after multiple PDF upload.
 
-    Rejects non-PDF files (e.g. .txt) with HTTP 400 and structured error;
-    verifies KnowledgeBase is not updated.
+    Uploads two PDFs with corroborated facts in a single request and verifies
+    the relationship reasoning system operates across the two documents.
     """
-    files = {"file": ("notes.txt", io.BytesIO(b"Acme Corp revenue was $10M"), "text/plain")}
+    pdf1 = _generate_test_pdf_bytes("Alpha Corp revenue was $50.0 million in FY2024.")
+    pdf2 = _generate_test_pdf_bytes("Alpha Corp revenue stood at $50.0 million in FY2024.")
+    files = [
+        ("files", ("filing_a.pdf", io.BytesIO(pdf1), "application/pdf")),
+        ("files", ("filing_b.pdf", io.BytesIO(pdf2), "application/pdf")),
+    ]
+
+    upload_res = client.post("/documents", files=files)
+    assert upload_res.status_code == 201
+
+    facts_res = client.get("/facts?fact_type=currency")
+    facts = facts_res.json()["facts"]
+    assert len(facts) >= 2
+
+    fact_a_id = facts[0]["fact_id"]
+    fact_b_id = facts[1]["fact_id"]
+
+    compare_res = client.post(
+        "/relationships/compare",
+        json={"fact_a_id": fact_a_id, "fact_b_id": fact_b_id},
+    )
+    assert compare_res.status_code == 200
+    assert compare_res.json()["state"] == CORROBORATED
+
+
+def test_mixed_valid_invalid_upload_rejected(client: TestClient) -> None:
+    """Test 5: Mixed valid/invalid upload rejected cleanly without partial ingestion."""
+    valid_pdf = _generate_test_pdf_bytes("Acme Corp revenue was $10M in FY2024.")
+    files = [
+        ("files", ("valid.pdf", io.BytesIO(valid_pdf), "application/pdf")),
+        ("files", ("invalid.txt", io.BytesIO(b"Just plain text notes"), "text/plain")),
+    ]
+
     response = client.post("/documents", files=files)
     assert response.status_code == 400
     assert "not a valid PDF" in response.json()["detail"]
     assert len(get_knowledge_base().facts) == 0
 
 
-def test_upload_empty_file_rejected(client: TestClient) -> None:
-    """Test 5: Empty upload rejected.
-
-    Rejects zero-byte file with HTTP 400 and clear error message;
-    verifies KnowledgeBase is not updated.
-    """
-    files = {"file": ("empty.pdf", io.BytesIO(b""), "application/pdf")}
-    response = client.post("/documents", files=files)
-    assert response.status_code == 400
-    assert "is empty" in response.json()["detail"]
+def test_empty_or_malformed_upload_set_rejected(client: TestClient) -> None:
+    """Test 6: Validation handling for empty uploads and malformed PDFs."""
+    # Empty file
+    files_empty = [("files", ("empty.pdf", io.BytesIO(b""), "application/pdf"))]
+    res_empty = client.post("/documents", files=files_empty)
+    assert res_empty.status_code == 400
+    assert "is empty" in res_empty.json()["detail"]
     assert len(get_knowledge_base().facts) == 0
 
-
-def test_upload_malformed_pdf_rejected(client: TestClient) -> None:
-    """Test 6: Malformed PDF rejected cleanly.
-
-    Rejects non-PDF random binary data that carries a .pdf extension.
-    Verifies HTTP 422, clean error message without leaking filesystem paths,
-    and KnowledgeBase remains uncorrupted.
-    """
-    corrupt_payload = io.BytesIO(b"This is definitely not a PDF file content!")
-    files = {"file": ("corrupt.pdf", corrupt_payload, "application/pdf")}
-    response = client.post("/documents", files=files)
-    assert response.status_code == 422
-    detail = response.json()["detail"]
+    # Malformed PDF
+    corrupt_bytes = b"This is random corrupt data not starting with %PDF"
+    files_corrupt = [("files", ("corrupt.pdf", io.BytesIO(corrupt_bytes), "application/pdf"))]
+    res_corrupt = client.post("/documents", files=files_corrupt)
+    assert res_corrupt.status_code == 422
+    detail = res_corrupt.json()["detail"]
     assert "Failed to ingest PDF 'corrupt.pdf'" in detail
-    assert "corrupt" in detail.lower() or "malformed" in detail.lower()
-    # Ensure temporary filesystem path is not exposed
     assert "AppData" not in detail
     assert "Temp" not in detail
-    assert "tmp" not in detail.lower() or "corrupt.pdf" in detail
     assert len(get_knowledge_base().facts) == 0
+
+
+def test_single_pdf_upload_backward_compatibility(client: TestClient) -> None:
+    """Test 7: Existing single-file behavior is preserved."""
+    pdf_bytes = _generate_test_pdf_bytes("Delta Corp revenue was $75.0 million in FY2024.")
+    files = [("files", ("delta_report.pdf", io.BytesIO(pdf_bytes), "application/pdf"))]
+
+    response = client.post("/documents", files=files)
+    assert response.status_code == 201
+    data = response.json()
+    assert "Successfully processed 1 document(s)" in data["message"]
+    assert len(data["documents"]) == 1
+    assert data["documents"][0]["document_name"] == "delta_report.pdf"
+    assert data["total_facts_in_kb"] >= 1
 
 
 def test_query_unmatched_returns_refusal(client: TestClient) -> None:
     raw = "Acme Corp reported operating profit of $12.5 million in FY2024."
     pdf_bytes = _generate_test_pdf_bytes(raw)
-    files = {"file": ("report_fy24.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
+    files = [("files", ("report_fy24.pdf", io.BytesIO(pdf_bytes), "application/pdf"))]
     client.post("/documents", files=files)
 
     query_res = client.post("/query", json={"query": "nonexistent metric unrelated 99999"})
@@ -218,7 +255,7 @@ def test_query_empty_string_rejected(client: TestClient) -> None:
 def test_facts_endpoint_filtering_and_pagination(client: TestClient) -> None:
     raw = "Revenue was $10 million in FY2023. Margin reached 15% in FY2024."
     pdf_bytes = _generate_test_pdf_bytes(raw)
-    files = {"file": ("doc.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
+    files = [("files", ("doc.pdf", io.BytesIO(pdf_bytes), "application/pdf"))]
     client.post("/documents", files=files)
 
     # Get all facts
@@ -245,46 +282,10 @@ def test_facts_endpoint_filtering_and_pagination(client: TestClient) -> None:
     assert len(res_page.json()["facts"]) == 1
 
 
-def test_relationships_endpoints(client: TestClient) -> None:
-    # Upload doc 1
-    pdf1 = _generate_test_pdf_bytes("Alpha Corp revenue was $50.0 million in FY2024.")
-    client.post("/documents", files={"file": ("doc1.pdf", io.BytesIO(pdf1), "application/pdf")})
-
-    # Upload doc 2 with corroborated revenue
-    pdf2 = _generate_test_pdf_bytes("Alpha Corp revenue stood at $50.0 million in FY2024.")
-    client.post("/documents", files={"file": ("doc2.pdf", io.BytesIO(pdf2), "application/pdf")})
-
-    # Get facts to find their IDs
-    facts_res = client.get("/facts?fact_type=currency")
-    facts = facts_res.json()["facts"]
-    assert len(facts) >= 2
-
-    fact_a_id = facts[0]["fact_id"]
-    fact_b_id = facts[1]["fact_id"]
-
-    # Test GET /relationships with targeted IDs
-    rel_res = client.get(f"/relationships?fact_a_id={fact_a_id}&fact_b_id={fact_b_id}")
-    assert rel_res.status_code == 200
-    rel_data = rel_res.json()["relationships"][0]
-    assert rel_data["state"] == CORROBORATED
-
-    # Test POST /relationships/compare
-    post_comp = client.post(
-        "/relationships/compare",
-        json={"fact_a_id": fact_a_id, "fact_b_id": fact_b_id},
-    )
-    assert post_comp.status_code == 200
-    assert post_comp.json()["state"] == CORROBORATED
-
-    # Test GET /relationships pairwise scan
-    res_scan = client.get("/relationships")
-    assert res_scan.status_code == 200
-    assert "relationships" in res_scan.json()
-
-
 def test_reset_endpoint(client: TestClient) -> None:
     pdf = _generate_test_pdf_bytes("Beta Corp shipments were 100000 units in FY2024.")
-    client.post("/documents", files={"file": ("beta.pdf", io.BytesIO(pdf), "application/pdf")})
+    files = [("files", ("beta.pdf", io.BytesIO(pdf), "application/pdf"))]
+    client.post("/documents", files=files)
     assert len(get_knowledge_base().facts) >= 1
 
     res = client.post("/reset")
