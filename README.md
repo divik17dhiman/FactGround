@@ -161,6 +161,20 @@ kb = KnowledgeBase.from_facts(validated_facts)
 result = kb.query("revenue")
 ```
 
+### 6. Cross-Fact Relationship Reasoning
+
+Compare facts across documents to determine whether they corroborate, contradict, or contextually reconcile:
+
+```python
+from superjoin_fact_knowledge import compare_facts
+
+# Compare two facts deterministically
+rel = compare_facts(fact_1, fact_2)
+print("Relationship State:", rel.state)
+# Outputs: 'CORROBORATED', 'CONTRADICTED', 'CONTEXTUALLY_RECONCILED', 'INCOMPARABLE', or 'UNCERTAIN'
+print("Explanation:", rel.explanation)
+```
+
 ## Architecture
 
 The current pipeline follows this flow:
@@ -256,9 +270,11 @@ ruff format .
 
 This repository is intentionally being structured as a production-quality foundation rather than a collection of ad hoc scripts. The objective is to create a clean engineering baseline suitable for future implementation work while preserving the assignment's requirement to remain generalizable across unseen PDFs.
 
-## Limitations
+## Scope and Limitations
 
-- Table structure is not modeled explicitly, so ambiguous tables may only be grounded to page text and nearby sentence context.
-- Sentence-level evidence is the current practical boundary for grounding; later phases may add richer span, table, or layout-aware grounding.
-- The project does not attempt question answering, embeddings, vector search, or chat-style interfaces in this phase.
-- Querying is still deterministic and pattern-based; it does not perform open-ended natural-language understanding.
+- **Tables**: Table text is extracted via page text streams; multi-column cell-to-header relationships in complex borderless tables without layout cues are not parsed into structured grids.
+- **Charts and Graphs**: Text elements (labels, legends, titles) are extracted from page text streams; graphical vector/raster curve interpretation is not parsed via computer vision.
+- **Scanned / Image-Only PDFs**: Non-text pages are detected through diagnostics (`has_extractable_text=False`); OCR binary engines (e.g. Tesseract) are not bundled to ensure zero external system dependencies on fresh checkout.
+- **Derived Calculations**: The system retrieves stated factual values directly; speculative arithmetic formulas or derived answers are not computed dynamically to avoid hallucination.
+- **Semantic Facts**: Structured entities and qualifiers associated with values are extracted deterministically; open-ended qualitative narrative claims without metrics or dates are reserved for future LLM phases.
+- **Sentence-Level Provenance**: Evidence grounding is established at sentence and page level; bounding-box span coordinates are preserved in metadata when provided by the ingestion layer.

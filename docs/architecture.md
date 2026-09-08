@@ -189,6 +189,26 @@ Phase 6 integrates the entire pipeline into a clean, minimal public interface:
 3. **Structured Result Contract**: `QueryResult` provides `.is_grounded`, `.top_fact`, and `.to_dict()` methods, producing a JSON-serializable dictionary with answers, candidates, and full evidence provenance.
 4. **Evaluator CLI**: A command-line interface (`superjoin` or `python -m superjoin_fact_knowledge`) allowing evaluators to query arbitrary PDFs from terminal with human-readable or `--json` structured output.
 
+## Phase 7 Cross-Fact Relationship Reasoning
+
+```text
+Fact A  ──┐
+          ├──> compare_facts() ──> FactRelationship (CORROBORATED, CONTRADICTED,
+Fact B  ──┘                                          CONTEXTUALLY_RECONCILED,
+                                                     INCOMPARABLE, UNCERTAIN)
+```
+
+Phase 7 implements the deterministic cross-fact comparison engine required by the hiring assignment specification:
+
+1. **Grounding Validation**: Non-grounded or review facts result in `UNCERTAIN` state.
+2. **Dimensional & Unit Compatibility**: Incompatible metrics or units (e.g. tonnes vs shipments) are classified as `INCOMPARABLE`.
+3. **Entity Compatibility**: Unrelated subjects are classified as `INCOMPARABLE`.
+4. **Value & Temporal Comparison**:
+   - Matching values in matching periods $\rightarrow$ `CORROBORATED`
+   - Conflicting values in matching periods $\rightarrow$ `CONTRADICTED`
+   - Different values explained by different reporting periods $\rightarrow$ `CONTEXTUALLY_RECONCILED`
+   - Differing values without confirmed period context $\rightarrow$ `UNCERTAIN`
+
 ## Why we keep the model simple
 
-The architecture separates ingestion, fact extraction, evidence validation, knowledge querying, and the evaluator interface. That keeps the package explainable and testable while preserving a clear path toward future phases such as fact normalization, entity matching, and relationships between facts.
+The architecture separates ingestion, fact extraction, evidence validation, knowledge querying, cross-fact relationship reasoning, and the evaluator interface. That keeps the package explainable and testable while preserving a clear path toward future extensions.
