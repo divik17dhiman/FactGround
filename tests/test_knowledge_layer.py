@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from superjoin_fact_knowledge import Fact, KnowledgeBase, query_facts
+from superjoin_fact_knowledge import Fact, KnowledgeBase, QueryMatch, QueryResult, query_facts
 
 
 def _fact(
@@ -302,3 +302,70 @@ def test_unexpected_query_text_does_not_crash() -> None:
 
     assert result.status == "no_grounded_answer"
     assert result.matches == ()
+
+
+def test_query_result_is_grounded_invariant() -> None:
+    """Verify is_grounded requires status answer_found, top_fact present, and top_fact grounded."""
+    grounded_fact = _fact(
+        fact_id="f-grounded",
+        subject="Revenue",
+        fact_type="currency",
+        raw_value="$10M",
+        normalized_value=10000000.0,
+        unit="currency",
+        page_number=1,
+        status="grounded",
+    )
+    review_fact = _fact(
+        fact_id="f-review",
+        subject="Revenue",
+        fact_type="currency",
+        raw_value="$10M",
+        normalized_value=10000000.0,
+        unit="currency",
+        page_number=1,
+        status="needs_review",
+    )
+
+    # 1. answer_found + grounded top fact -> is_grounded is True
+    res_grounded = QueryResult(
+        query="Revenue",
+        status="answer_found",
+        matches=(QueryMatch(fact=grounded_fact, score=10.0),),
+        answer_text="Revenue was $10M.",
+    )
+    assert res_grounded.is_grounded is True
+
+    # 2. answer_found + non-grounded/review top fact -> is_grounded is False
+    res_review = QueryResult(
+        query="Revenue",
+        status="answer_found",
+        matches=(QueryMatch(fact=review_fact, score=10.0),),
+        answer_text="Revenue was $10M.",
+    )
+    assert res_review.is_grounded is False
+
+    # 3. answer_found + no top fact -> is_grounded is False
+    res_empty_matches = QueryResult(
+        query="Revenue",
+        status="answer_found",
+        matches=(),
+        answer_text="Revenue was $10M.",
+    )
+    assert res_empty_matches.is_grounded is False
+
+    # 4. ambiguous -> is_grounded is False
+    res_ambiguous = QueryResult(
+        query="Revenue",
+        status="ambiguous",
+        matches=(QueryMatch(fact=grounded_fact, score=10.0),),
+    )
+    assert res_ambiguous.is_grounded is False
+
+    # 5. no_grounded_answer -> is_grounded is False
+    res_no_answer = QueryResult(
+        query="Revenue",
+        status="no_grounded_answer",
+        matches=(),
+    )
+    assert res_no_answer.is_grounded is False

@@ -64,8 +64,12 @@ class QueryResult:
 
     @property
     def is_grounded(self) -> bool:
-        """Return True if an unambiguous grounded answer was found."""
-        return self.status == "answer_found"
+        """Return True only if an answer was found and the top fact is confirmed grounded."""
+        return (
+            self.status == "answer_found"
+            and self.top_fact is not None
+            and self.top_fact.status == "grounded"
+        )
 
     @property
     def top_fact(self) -> Fact | None:
