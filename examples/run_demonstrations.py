@@ -85,16 +85,16 @@ def run_case_1_corroboration(base_dir: Path) -> dict[str, Any]:
 def run_case_2_contradiction(base_dir: Path) -> dict[str, Any]:
     """Case 2: Contradiction between conflicting claims for the same period."""
     dir_path = base_dir / "contradiction"
-    doc_a_path = dir_path / "official_filing.pdf"
-    doc_b_path = dir_path / "analyst_estimate.pdf"
+    doc_a_path = dir_path / "disclosure_doc_a.pdf"
+    doc_b_path = dir_path / "disclosure_doc_b.pdf"
 
     create_demo_pdf(
         doc_a_path,
-        "Acme Corp reported operating profit of $38.5 million in FY2024.",
+        "Company Alpha reported operating profit of $38.5 million in FY2024.",
     )
     create_demo_pdf(
         doc_b_path,
-        "Acme Corp reported operating profit of $45.0 million in FY2024.",
+        "Company Alpha reported operating profit of $45.0 million in FY2024.",
     )
 
     kb_a = build_knowledge_base(str(doc_a_path))

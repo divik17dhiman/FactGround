@@ -212,7 +212,7 @@ The assignment specification explicitly mandates demonstration of four core eval
 | Case | Category | Input Documents | Evaluated State | Result |
 | :--- | :--- | :--- | :--- | :--- |
 | **Case 1** | **Corroboration** | `filing_doc_a.pdf`, `press_release_doc_b.pdf` | `CORROBORATED` | **PASS** |
-| **Case 2** | **Contradiction** | `official_filing.pdf`, `analyst_estimate.pdf` | `CONTRADICTED` | **PASS** |
+| **Case 2** | **Contradiction** | `disclosure_doc_a.pdf`, `disclosure_doc_b.pdf` | `CONTRADICTED` | **PASS** |
 | **Case 3** | **Contextual Reconciliation** | `annual_report_fy23.pdf`, `annual_report_fy24.pdf` | `CONTEXTUALLY_RECONCILED` | **PASS** |
 | **Case 4** | **Extraction Failure & Refusal** | `scanned_receipt_image_only.pdf` | `no_grounded_answer` | **PASS** |
 
@@ -310,7 +310,7 @@ Facts marked as `needs_review` are quarantined and can never be promoted to an a
 
 - **Starter Dataset Independence**: The implementation contains zero hardcoded company names, numbers, or starter filenames. It executes identically on arbitrary unseen business reports.
 - **Cross-Document Provenance**: Multi-document ingestion (`build_knowledge_base([pdf1, pdf2])`) preserves the distinct originating document name and SHA-256 identifier for every fact.
-- **Robust Test Coverage**: The project includes 71+ unit, integration, CLI, API, real starter document, and evaluation demonstration tests.
+- **Robust Test Coverage**: The project includes 83 unit, integration, CLI, API, real starter document, and evaluation demonstration tests.
 
 ```bash
 # Run the complete test suite:

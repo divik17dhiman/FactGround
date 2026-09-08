@@ -55,39 +55,43 @@ Two independent documents report the same underlying financial metric for the sa
 ## Case 2: Genuine or Likely Contradiction
 
 ### Case Overview
-Two documents reporting on the same corporate entity and reporting period provide conflicting quantitative values for the same metric.
+Two documents reporting on the same corporate entity and reporting period provide conflicting quantitative values for the same metric under the same epistemic tier (both asserting reported actuals).
+
+> **Disclosure:** *Synthetic fixture used solely to demonstrate the contradiction reasoning path; it is not presented as real-world evidence.*
 
 ### Input Documents
-- **Document A**: `official_filing.pdf` (Page 1)
-  - Text: `"Acme Corp reported operating profit of $38.5 million in FY2024."`
-- **Document B**: `analyst_estimate.pdf` (Page 1)
-  - Text: `"Acme Corp reported operating profit of $45.0 million in FY2024."`
+- **Document A**: `disclosure_doc_a.pdf` (Page 1)
+  - Text: `"Company Alpha reported operating profit of $38.5 million in FY2024."`
+- **Document B**: `disclosure_doc_b.pdf` (Page 1)
+  - Text: `"Company Alpha reported operating profit of $45.0 million in FY2024."`
 
 ### Source Evidence & Extracted Facts
 - **Fact A**:
-  - Entity / Subject: `Corp operating profit`
+  - Entity / Subject: `Alpha operating profit`
   - Raw Value: `$38.5 million`
   - Normalized Value: `38500000.0`
   - Unit: `currency (USD)`
   - Period: `2024`
-  - Provenance: `official_filing.pdf`, Page 1
+  - Provenance: `disclosure_doc_a.pdf`, Page 1
   - Grounding Status: `grounded`
+  - Epistemic Status: Reported corporate actual
 - **Fact B**:
-  - Entity / Subject: `Corp operating profit`
+  - Entity / Subject: `Alpha operating profit`
   - Raw Value: `$45.0 million`
   - Normalized Value: `45000000.0`
   - Unit: `currency (USD)`
   - Period: `2024`
-  - Provenance: `analyst_estimate.pdf`, Page 1
+  - Provenance: `disclosure_doc_b.pdf`, Page 1
   - Grounding Status: `grounded`
+  - Epistemic Status: Reported corporate actual
 
 ### Observed Relationship Result
 - **Relationship State**: `CONTRADICTED`
 - **Confidence**: `1.0`
 - **Explanation**: `Contradicting values ($38.5 million vs $45.0 million) reported for the same period (2024).`
 
-### Verification
-- **Expected Behavior**: Both facts share the same subject entity (`operating profit`) and same temporal window (`2024`), but report incompatible normalized numbers ($38.5M vs $45.0M). Must be classified as `CONTRADICTED` without guessing an artificial reconciliation.
+### Epistemic Verification
+- **Expected Behavior**: Both grounded sources assert different operating-profit values for the same entity, metric, fiscal period, and unit. Because both statements share the same epistemic status (historical reported actuals) rather than an estimate/forecast miss, they genuinely contradict each other and must be classified as `CONTRADICTED` without guessing an artificial reconciliation.
 - **Status**: **PASS**
 
 ---

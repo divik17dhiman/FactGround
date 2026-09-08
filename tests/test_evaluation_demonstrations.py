@@ -39,12 +39,32 @@ def test_case_2_contradiction(tmp_path: Path) -> None:
     res = run_case_2_contradiction(tmp_path)
     assert res["passed"] is True
     assert res["relationship"]["state"] == CONTRADICTED
-    assert "operating profit" in res["fact_a"]["subject"].lower()
+
+    # Verify same entity, metric, period, unit
+    assert "Alpha operating profit" in res["fact_a"]["subject"]
+    assert "Alpha operating profit" in res["fact_b"]["subject"]
+    assert res["fact_a"]["unit"] == res["fact_b"]["unit"]
+
+    # Verify both are grounded actual reported claims
+    assert res["fact_a"]["status"] == "grounded"
+    assert res["fact_b"]["status"] == "grounded"
+    assert res["fact_a"]["page"] == 1
+    assert res["fact_b"]["page"] == 1
+    assert res["fact_a"]["document"] == "disclosure_doc_a.pdf"
+    assert res["fact_b"]["document"] == "disclosure_doc_b.pdf"
+
+    # Verify conflicting values
     assert "38.5 million" in res["fact_a"]["raw_value"]
     assert "45.0 million" in res["fact_b"]["raw_value"]
     assert "Contradicting values" in res["relationship"]["explanation"]
-    assert res["fact_a"]["status"] == "grounded"
-    assert res["fact_b"]["status"] == "grounded"
+
+    # Regression: Ensure no epistemic mismatch (no analyst estimate or forecast language)
+    assert "analyst" not in res["fact_a"]["document"].lower()
+    assert "analyst" not in res["fact_b"]["document"].lower()
+    assert "estimate" not in res["fact_a"]["document"].lower()
+    assert "estimate" not in res["fact_b"]["document"].lower()
+    assert "estimate" not in res["fact_a"]["evidence"].lower()
+    assert "estimate" not in res["fact_b"]["evidence"].lower()
 
 
 def test_case_3_contextual_reconciliation(tmp_path: Path) -> None:
