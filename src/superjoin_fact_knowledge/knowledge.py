@@ -299,6 +299,12 @@ class KnowledgeBase:
             include_needs_review=include_needs_review,
         )
 
+    def compare_facts(self, fact_a: Fact, fact_b: Fact) -> Any:
+        """Compare two facts and classify their relationship."""
+        from .relationship import compare_facts as _compare_facts
+
+        return _compare_facts(fact_a, fact_b)
+
 
 def query_facts(
     knowledge_base: KnowledgeBase,
