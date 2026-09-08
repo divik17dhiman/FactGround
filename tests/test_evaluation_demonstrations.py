@@ -69,3 +69,58 @@ def test_case_4_extraction_failure_and_refusal(tmp_path: Path) -> None:
     assert res["query_status"] == "no_grounded_answer"
     assert res["is_grounded"] is False
     assert res["answer"] is None
+
+
+def test_evidence_provenance_and_grounding_invariants(tmp_path: Path) -> None:
+    """Verify that every grounded fact retains valid evidence text and respects the invariant."""
+    for case_fn in (
+        run_case_1_corroboration,
+        run_case_2_contradiction,
+        run_case_3_contextual_reconciliation,
+    ):
+        res = case_fn(tmp_path)
+        for key in ("fact_a", "fact_b"):
+            fact_dict = res[key]
+            assert fact_dict["status"] == "grounded"
+            assert fact_dict["page"] >= 1
+            assert len(fact_dict["evidence"]) > 0
+            # Confirm raw_value appears in the cited evidence
+            assert fact_dict["raw_value"] in fact_dict["evidence"]
+
+
+def test_real_starter_document_corroboration() -> None:
+    """Verify genuine corroboration between Delhivery Annual Report and Earnings Presentation."""
+    from superjoin_fact_knowledge import build_knowledge_base, compare_facts
+
+    starter_dir = Path("starter-datasets/starter-datasets/delhivery")
+    ar_path = starter_dir / "02-delhivery-annual-report-fy24-excerpt.pdf"
+    q4_path = starter_dir / "03-delhivery-q4-fy24-earnings-presentation.pdf"
+
+    if not ar_path.exists() or not q4_path.exists():
+        return  # Gracefully skip if starter datasets are absent
+
+    kb_ar = build_knowledge_base(str(ar_path))
+    kb_q4 = build_knowledge_base(str(q4_path))
+
+    # Amortisation expense on page 36 of Annual Report (13.19%) vs page 17 of Q4 Earnings (13.2%)
+    facts_ar = [
+        f for f in kb_ar.grounded_facts()
+        if "amortisation" in f.subject.lower()
+        and f.page_number == 36
+        and f.fact_type == "percentage"
+    ]
+    facts_q4 = [
+        f for f in kb_q4.grounded_facts()
+        if "amortisation" in f.subject.lower()
+        and f.page_number == 17
+        and "13.2" in f.raw_value
+    ]
+
+    assert len(facts_ar) >= 1
+    assert len(facts_q4) >= 1
+
+    rel = compare_facts(facts_ar[0], facts_q4[0])
+    assert rel.state == CORROBORATED
+    assert "13.19" in str(facts_ar[0].normalized_value)
+    assert "13.2" in str(facts_q4[0].raw_value)
+
