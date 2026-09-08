@@ -8,11 +8,14 @@ from superjoin_fact_knowledge import (
     KnowledgeBase,
     extract_facts,
     ingest_pdf,
-    query_facts,
     validate_facts,
 )
 
 STARTER_BASE = Path(__file__).parent.parent / "starter-datasets" / "starter-datasets"
+pytestmark = pytest.mark.skipif(
+    not STARTER_BASE.exists(),
+    reason="Starter datasets not present in environment",
+)
 
 
 class TestDelhiveryProspectus:
