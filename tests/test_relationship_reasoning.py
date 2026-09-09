@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pymupdf as fitz
 
-from superjoin_fact_knowledge import (
+from factground import (
     CONTEXTUALLY_RECONCILED,
     CONTRADICTED,
     CORROBORATED,
@@ -524,8 +524,8 @@ def test_real_delhivery_prospectus_scopes_not_contradicted() -> None:
 
 def test_local_temporal_association_test_a_two_values_two_periods() -> None:
     """Test A: Two values, two periods in one sentence get separate local periods."""
-    from superjoin_fact_knowledge.document import Document, DocumentDiagnostics, Page
-    from superjoin_fact_knowledge.fact import _sentence_fact_candidates, validate_facts
+    from factground.document import Document, DocumentDiagnostics, Page
+    from factground.fact import _sentence_fact_candidates, validate_facts
 
     page = Page(page_number=1, text="")
     diag = DocumentDiagnostics(page_count=1, pages_with_text=1, pages_without_text=0)
@@ -554,8 +554,8 @@ def test_local_temporal_association_test_a_two_values_two_periods() -> None:
 
 def test_local_temporal_association_test_b_from_to_construction() -> None:
     """Test B: From ... to ... construction associates correct period to each value."""
-    from superjoin_fact_knowledge.document import Document, DocumentDiagnostics, Page
-    from superjoin_fact_knowledge.fact import _sentence_fact_candidates, validate_facts
+    from factground.document import Document, DocumentDiagnostics, Page
+    from factground.fact import _sentence_fact_candidates, validate_facts
 
     page = Page(page_number=1, text="")
     diag = DocumentDiagnostics(page_count=1, pages_with_text=1, pages_without_text=0)
@@ -584,8 +584,8 @@ def test_local_temporal_association_test_b_from_to_construction() -> None:
 
 def test_local_temporal_association_test_c_compared_with_construction() -> None:
     """Test C: Compared-with construction associates correct 4-digit year to each value."""
-    from superjoin_fact_knowledge.document import Document, DocumentDiagnostics, Page
-    from superjoin_fact_knowledge.fact import _sentence_fact_candidates, validate_facts
+    from factground.document import Document, DocumentDiagnostics, Page
+    from factground.fact import _sentence_fact_candidates, validate_facts
 
     page = Page(page_number=1, text="")
     diag = DocumentDiagnostics(page_count=1, pages_with_text=1, pages_without_text=0)
@@ -614,8 +614,8 @@ def test_local_temporal_association_test_c_compared_with_construction() -> None:
 
 def test_local_temporal_association_test_d_forecast_growth_construction() -> None:
     """Test D: Forecast/growth construction associates periods and captures qualifier."""
-    from superjoin_fact_knowledge.document import Document, DocumentDiagnostics, Page
-    from superjoin_fact_knowledge.fact import _sentence_fact_candidates, validate_facts
+    from factground.document import Document, DocumentDiagnostics, Page
+    from factground.fact import _sentence_fact_candidates, validate_facts
 
     page = Page(page_number=1, text="")
     diag = DocumentDiagnostics(page_count=1, pages_with_text=1, pages_without_text=0)
@@ -736,8 +736,8 @@ def test_local_temporal_association_test_g_same_value_different_periods() -> Non
 
 def test_local_temporal_association_test_h_ambiguous_period_returns_none() -> None:
     """Test H: Ambiguous periods leave period as None, avoiding false contradiction."""
-    from superjoin_fact_knowledge.document import Document, DocumentDiagnostics, Page
-    from superjoin_fact_knowledge.fact import _sentence_fact_candidates
+    from factground.document import Document, DocumentDiagnostics, Page
+    from factground.fact import _sentence_fact_candidates
 
     page = Page(page_number=1, text="")
     diag = DocumentDiagnostics(page_count=1, pages_with_text=1, pages_without_text=0)

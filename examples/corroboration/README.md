@@ -1,7 +1,7 @@
 # Case 1 — Corroboration Demonstration
 
 ## Purpose
-Demonstrates that SuperJoin identifies two independent documents reporting the same underlying fact as **CORROBORATED**, even when phrased with different wording.
+Demonstrates that FactGround identifies two independent documents reporting the same underlying fact as **CORROBORATED**, even when phrased with different wording.
 
 ## Input Documents
 1. `filing_doc_a.pdf` (Page 1):
@@ -36,5 +36,5 @@ Demonstrates that SuperJoin identifies two independent documents reporting the s
 ```bash
 python examples/run_demonstrations.py
 # Or inspect via CLI:
-python -m superjoin_fact_knowledge examples/corroboration/filing_doc_a.pdf examples/corroboration/press_release_doc_b.pdf -q "Express Parcel revenue"
+python -m factground examples/corroboration/filing_doc_a.pdf examples/corroboration/press_release_doc_b.pdf -q "Express Parcel revenue"
 ```

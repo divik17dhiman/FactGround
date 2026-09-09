@@ -1,4 +1,4 @@
-# SuperJoin Required Evaluation Cases
+# FactGround Required Evaluation Cases
 
 This directory contains reproducible demonstration fixtures, documentation, and a test runner for the four evaluation cases required by the assignment specification:
 

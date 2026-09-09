@@ -6,7 +6,7 @@ from pathlib import Path
 
 import fitz
 
-from superjoin_fact_knowledge import KnowledgeBase, extract_facts, ingest_pdf, validate_facts
+from factground import KnowledgeBase, extract_facts, ingest_pdf, validate_facts
 
 
 def _write_pdf(path: Path, page_texts: list[str]) -> None:

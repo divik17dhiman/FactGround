@@ -1,7 +1,7 @@
-# SuperJoin Fact Knowledge Layer
+# FactGround
 
-> **SuperJoin VIT 2026 Engineering Intern Hiring Assignment**  
-> *A deterministic, evidence-grounded Fact Knowledge Layer for financial and business documents.*
+> **FactGround**<br>
+> *An evidence-grounded fact knowledge layer for extracting, validating, querying, and reasoning over structured facts from documents.*
 
 ---
 
@@ -13,7 +13,11 @@
 
 ## Project Overview
 
-The **SuperJoin Fact Knowledge Layer** is an extensible Python application designed to ingest arbitrary financial and business PDFs, extract structured numerical and semantic facts, validate them strictly against source page evidence, query them deterministically without hallucination, and classify cross-fact relationships across documents.
+**FactGround** is an evidence-grounded fact knowledge layer designed to ingest arbitrary financial and business PDFs, extract structured numerical and semantic facts, validate them strictly against source page evidence, query them deterministically without hallucination, and classify cross-fact relationships across documents.
+
+Importantly, FactGround is **not** a chatbot, conversational wrapper, or generic RAG application. It treats facts as first-class, verifiable entities grounded to source provenance and reasons over them through an explicit pipeline:
+
+$$\text{PDF} \longrightarrow \text{Facts} \longrightarrow \text{Validation} \longrightarrow \text{Provenance} \longrightarrow \text{Knowledge} \longrightarrow \text{Reasoning}$$
 
 The core design philosophy is **evidence-first and deterministic**:
 - Every published answer is grounded in verbatim page text and provenance metadata (document ID, page number).
@@ -58,10 +62,10 @@ The application exposes a complete REST API powered by FastAPI for uploading PDF
 
 ```bash
 # Using uvicorn directly:
-uvicorn superjoin_fact_knowledge.api:app --host 127.0.0.1 --port 8000 --reload
+uvicorn factground.api:app --host 127.0.0.1 --port 8000 --reload
 
 # Or via Python module:
-python -m uvicorn superjoin_fact_knowledge.api:app --port 8000
+python -m uvicorn factground.api:app --port 8000
 ```
 
 Once running, interactive **Swagger / OpenAPI documentation** is available at:
@@ -164,21 +168,21 @@ curl -X POST "http://localhost:8000/relationships/compare" \
 
 ### Running the Command-Line Interface (CLI)
 
-The package provides a fast CLI via `superjoin` or `python -m superjoin_fact_knowledge`:
+The package provides a fast CLI via `factground` or `python -m factground`:
 
 **Human-Readable Terminal Output:**
 ```bash
-python -m superjoin_fact_knowledge report.pdf -q "revenue in FY2024"
+python -m factground report.pdf -q "revenue in FY2024"
 ```
 
 **Structured JSON Output:**
 ```bash
-python -m superjoin_fact_knowledge report.pdf -q "revenue in FY2024" --json
+python -m factground report.pdf -q "revenue in FY2024" --json
 ```
 
 **Multi-Document Querying:**
 ```bash
-python -m superjoin_fact_knowledge doc1.pdf doc2.pdf -q "operating margin"
+python -m factground doc1.pdf doc2.pdf -q "operating margin"
 ```
 
 ---
@@ -186,7 +190,7 @@ python -m superjoin_fact_knowledge doc1.pdf doc2.pdf -q "operating margin"
 ### Python Library Usage
 
 ```python
-from superjoin_fact_knowledge import build_knowledge_base, query, compare_facts
+from factground import build_knowledge_base, query, compare_facts
 
 # 1. Build knowledge base from single or multiple PDFs
 kb = build_knowledge_base(["filing_2023.pdf", "filing_2024.pdf"])

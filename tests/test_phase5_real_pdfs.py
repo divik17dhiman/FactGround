@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from superjoin_fact_knowledge import (
+from factground import (
     KnowledgeBase,
     extract_facts,
     ingest_pdf,

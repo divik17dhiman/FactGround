@@ -1,6 +1,6 @@
 # Evaluator Verification Report: Four Required Evaluation Cases
 
-This document provides independent quality-control verification for the four core assignment demonstration cases in the SuperJoin Fact Knowledge Layer.
+This document provides independent quality-control verification for the four core assignment demonstration cases in FactGround.
 
 Each case has been validated against source evidence, page provenance, and relationship reasoning invariants.
 
@@ -162,7 +162,7 @@ A scanned or image-only PDF containing no extractable character stream is suppli
 ### Limitation Analysis & Future Roadmap
 - **Why this is a limitation**:
   - Ingestion relies on native text extraction streams via PyMuPDF. It does not bundle heavy OCR engines (e.g. Tesseract or cloud OCR APIs) to keep checkout and runtime dependencies lightweight and zero-dependency.
-- **How SuperJoin handles it safely**:
+- **How FactGround handles it safely**:
   - The system detects the lack of extractable text, marks the diagnostic cleanly, extracts zero speculative facts, and refuses to hallucinate answers.
 - **Future Improvement**:
   - Integrate an optional OCR plugin into `ingest_pdf()` for image-only pages when system OCR libraries are available.

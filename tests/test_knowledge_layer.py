@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from superjoin_fact_knowledge import Fact, KnowledgeBase, QueryMatch, QueryResult, query_facts
+from factground import Fact, KnowledgeBase, QueryMatch, QueryResult, query_facts
 
 
 def _fact(

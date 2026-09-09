@@ -1,4 +1,4 @@
-"""FastAPI application exposing the SuperJoin Fact Knowledge Layer.
+"""FastAPI application exposing FactGround.
 
 Provides endpoints for:
 - Uploading and ingesting PDF documents into the KnowledgeBase (POST /documents)
@@ -61,10 +61,10 @@ class PDFUploadFile(UploadFile):
 
 
 app = FastAPI(
-    title="SuperJoin Fact Knowledge Layer API",
+    title="FactGround API",
     description=(
-        "Evaluator API for ingesting financial/business PDFs, extracting grounded facts, "
-        "querying verifiable evidence, and reasoning about cross-fact relationships."
+        "An evidence-grounded fact knowledge layer for extracting, validating, "
+        "querying, and reasoning over structured facts from documents."
     ),
     version="0.1.0",
 )
@@ -115,7 +115,7 @@ class CompareRequest(BaseModel):
 def root_info() -> dict[str, Any]:
     """Root metadata endpoint."""
     return {
-        "service": "SuperJoin Fact Knowledge Layer API",
+        "service": "FactGround API",
         "version": "0.1.0",
         "total_facts": len(_kb.facts),
         "grounded_facts": len(_kb.grounded_facts()),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from superjoin_fact_knowledge import Document, DocumentDiagnostics, Page, extract_facts
+from factground import Document, DocumentDiagnostics, Page, extract_facts
 
 
 def _make_document(*, pages: list[Page]) -> Document:

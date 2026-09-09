@@ -1,7 +1,7 @@
 # Case 4 — Extraction Failure & Conservative Refusal Demonstration
 
 ## Purpose
-Demonstrates a genuine, honest limitation of the current deterministic pipeline and how SuperJoin conservatively refuses to hallucinate an unsupported answer.
+Demonstrates a genuine, honest limitation of the current deterministic pipeline and how FactGround conservatively refuses to hallucinate an unsupported answer.
 
 ## Input Document
 `scanned_receipt_image_only.pdf` (Page 1):
@@ -20,8 +20,8 @@ Demonstrates a genuine, honest limitation of the current deterministic pipeline 
    - `answer`: `None`
 4. **Why this is a limitation**:
    - The current baseline does not bundle external OCR engines (such as Tesseract) to keep the project lightweight and free of heavy C-binary system dependencies.
-5. **How SuperJoin handles it safely**:
-   - Rather than guessing or hallucinating an answer, SuperJoin flags that no extractable text exists and explicitly returns `no_grounded_answer`.
+5. **How FactGround handles it safely**:
+   - Rather than guessing or hallucinating an answer, FactGround flags that no extractable text exists and explicitly returns `no_grounded_answer`.
 6. **Future improvement**:
    - An optional OCR adapter (e.g. `pytesseract` or an OCR vision API) can be hooked behind the existing ingestion interface without modifying downstream fact extraction or query logic.
 

@@ -8,8 +8,8 @@ import pymupdf as fitz
 import pytest
 from fastapi.testclient import TestClient
 
-from superjoin_fact_knowledge.api import app, get_knowledge_base, reset_knowledge_base
-from superjoin_fact_knowledge.relationship import CORROBORATED
+from factground.api import app, get_knowledge_base, reset_knowledge_base
+from factground.relationship import CORROBORATED
 
 
 def _generate_test_pdf_bytes(text: str) -> bytes:
@@ -39,7 +39,7 @@ def test_root_endpoint_metadata(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["service"] == "SuperJoin Fact Knowledge Layer API"
+    assert data["service"] == "FactGround API"
     assert "endpoints" in data
     assert data["total_facts"] == 0
 

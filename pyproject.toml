@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "superjoin-fact-knowledge-layer"
+name = "factground"
 version = "0.1.0"
-description = "Fact Knowledge Layer for extracting, grounding, and comparing facts from financial and business PDFs."
+description = "An evidence-grounded fact knowledge layer for extracting, validating, querying, and reasoning over structured facts from documents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Superjoin VIT 2026" }]
+authors = [{ name = "FactGround Contributors" }]
 keywords = [
     "pdf",
     "fact extraction",
@@ -43,8 +43,8 @@ dev = [
 ]
 
 [project.scripts]
-superjoin = "superjoin_fact_knowledge.cli:main"
-superjoin-api = "superjoin_fact_knowledge.api:app"
+factground = "factground.cli:main"
+factground-api = "factground.api:app"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

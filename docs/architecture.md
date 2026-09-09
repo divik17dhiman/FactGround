@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Superjoin Fact Knowledge Layer is intended to process previously unseen financial and business PDFs and convert them into a structured, evidence-grounded fact model that can be compared across documents.
+The FactGround knowledge layer is intended to process previously unseen financial and business PDFs and convert them into a structured, evidence-grounded fact model that can be compared across documents.
 
 ## Core Principles
 
@@ -179,7 +179,7 @@ query() / kb.query()
   ↓
 QueryResult (status, is_grounded, answer, evidence, to_dict())
   ↓
-CLI (`python -m superjoin_fact_knowledge` or `superjoin`)
+CLI (`python -m factground` or `factground`)
 ```
 
 Phase 6 integrates the entire pipeline into a clean, minimal public interface:
@@ -187,7 +187,7 @@ Phase 6 integrates the entire pipeline into a clean, minimal public interface:
 1. **High-Level Workflow**: `build_knowledge_base(pdf_paths)` handles ingestion, fact extraction, and grounding validation across one or multiple PDFs, returning an aggregated, queryable `KnowledgeBase`.
 2. **Multi-Document Support**: Facts retain `document_name` and `document_id` so cross-document provenance is always explicit.
 3. **Structured Result Contract**: `QueryResult` provides `.is_grounded`, `.top_fact`, and `.to_dict()` methods, producing a JSON-serializable dictionary with answers, candidates, and full evidence provenance.
-4. **Evaluator CLI**: A command-line interface (`superjoin` or `python -m superjoin_fact_knowledge`) allowing evaluators to query arbitrary PDFs from terminal with human-readable or `--json` structured output.
+4. **Evaluator CLI**: A command-line interface (`factground` or `python -m factground`) allowing evaluators to query arbitrary PDFs from terminal with human-readable or `--json` structured output.
 
 ## Phase 7 Cross-Fact Relationship Reasoning
 

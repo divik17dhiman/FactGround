@@ -15,14 +15,14 @@ from typing import Any
 
 import pymupdf as fitz
 
-from superjoin_fact_knowledge.ingestion import ingest_pdf
-from superjoin_fact_knowledge.relationship import (
+from factground.ingestion import ingest_pdf
+from factground.relationship import (
     CONTEXTUALLY_RECONCILED,
     CONTRADICTED,
     CORROBORATED,
     compare_facts,
 )
-from superjoin_fact_knowledge.workflow import build_knowledge_base, query
+from factground.workflow import build_knowledge_base, query
 
 
 def create_demo_pdf(path: Path, text: str) -> Path:
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
     results = run_all_demonstrations()
     print("=" * 68)
-    print("SUPERJOIN EVALUATION DEMONSTRATIONS - 4 REQUIRED CASES")
+    print("FACTGROUND EVALUATION DEMONSTRATIONS - 4 REQUIRED CASES")
     print("=" * 68)
     for r in results:
         status_str = "PASS" if r["passed"] else "FAIL"

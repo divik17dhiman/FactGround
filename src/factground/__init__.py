@@ -1,4 +1,4 @@
-"""Superjoin Fact Knowledge Layer package."""
+"""FactGround package: an evidence-grounded fact knowledge layer."""
 
 from .api import app
 from .document import Document, DocumentDiagnostics, Page, PageDiagnostic

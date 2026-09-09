@@ -1,4 +1,4 @@
-"""Command-line interface for the Superjoin Fact Knowledge Layer."""
+"""Command-line interface for FactGround."""
 
 from __future__ import annotations
 
@@ -61,8 +61,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             pass
 
     parser = argparse.ArgumentParser(
-        prog="superjoin",
-        description="Extract, ground, and query facts from financial and business PDFs.",
+        prog="factground",
+        description="Extract, ground, and query facts from documents.",
     )
     parser.add_argument(
         "pdf_paths",

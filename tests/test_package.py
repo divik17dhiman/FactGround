@@ -1,6 +1,6 @@
 """Smoke tests for the project package foundation."""
 
-from superjoin_fact_knowledge import __version__
+from factground import __version__
 
 
 def test_package_metadata_is_present() -> None:

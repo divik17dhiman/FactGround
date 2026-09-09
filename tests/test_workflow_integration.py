@@ -7,7 +7,7 @@ from pathlib import Path
 import pymupdf as fitz
 import pytest
 
-from superjoin_fact_knowledge import (
+from factground import (
     PDFIngestionError,
     build_knowledge_base,
     query,

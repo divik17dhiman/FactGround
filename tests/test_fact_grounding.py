@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from superjoin_fact_knowledge import (
+from factground import (
     Document,
     DocumentDiagnostics,
     Fact,

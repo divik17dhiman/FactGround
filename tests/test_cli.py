@@ -1,4 +1,4 @@
-"""Tests for the superjoin command-line interface."""
+"""Tests for the factground command-line interface."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pymupdf as fitz
 import pytest
 
-from superjoin_fact_knowledge.cli import main
+from factground.cli import main
 
 
 def _create_test_pdf(path: Path, text: str) -> Path:
@@ -26,7 +26,7 @@ def test_cli_help_exits_cleanly(capsys: pytest.CaptureFixture[str]) -> None:
         main(["--help"])
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
-    assert "usage: superjoin" in captured.out
+    assert "usage: factground" in captured.out
 
 
 def test_cli_query_text_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

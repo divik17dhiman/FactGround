@@ -1,7 +1,7 @@
 # Case 3 — Contextual Reconciliation Demonstration
 
 ## Purpose
-Demonstrates that SuperJoin explains an apparent contradiction between two different values as **CONTEXTUALLY_RECONCILED** when the difference is accounted for by reporting period context (e.g. FY2023 vs FY2024).
+Demonstrates that FactGround explains an apparent contradiction between two different values as **CONTEXTUALLY_RECONCILED** when the difference is accounted for by reporting period context (e.g. FY2023 vs FY2024).
 
 ## Input Documents
 1. `annual_report_fy23.pdf` (Page 1):

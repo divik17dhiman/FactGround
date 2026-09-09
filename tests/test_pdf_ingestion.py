@@ -7,7 +7,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from superjoin_fact_knowledge import Document, PDFIngestionError, ingest_pdf
+from factground import Document, PDFIngestionError, ingest_pdf
 
 
 def _write_pdf(path: Path, page_texts: list[str | None]) -> None:

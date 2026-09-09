@@ -15,7 +15,7 @@ from examples.run_demonstrations import (
     run_case_3_contextual_reconciliation,
     run_case_4_extraction_failure,
 )
-from superjoin_fact_knowledge.relationship import (
+from factground.relationship import (
     CONTEXTUALLY_RECONCILED,
     CONTRADICTED,
     CORROBORATED,
@@ -110,7 +110,7 @@ def test_evidence_provenance_and_grounding_invariants(tmp_path: Path) -> None:
 
 def test_real_starter_document_corroboration() -> None:
     """Verify genuine corroboration between Delhivery Annual Report and Earnings Presentation."""
-    from superjoin_fact_knowledge import build_knowledge_base, compare_facts
+    from factground import build_knowledge_base, compare_facts
 
     starter_dir = Path("starter-datasets/starter-datasets/delhivery")
     ar_path = starter_dir / "02-delhivery-annual-report-fy24-excerpt.pdf"

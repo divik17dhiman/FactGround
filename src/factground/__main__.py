@@ -1,4 +1,4 @@
-"""Main module entry point for python -m superjoin_fact_knowledge."""
+"""Main module entry point for python -m factground."""
 
 import sys
 

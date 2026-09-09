@@ -1,7 +1,7 @@
 # Case 2 — Contradiction Demonstration
 
 ## Purpose
-Demonstrates that SuperJoin identifies two conflicting factual claims of the **same epistemic status** (both asserting reported actuals for the same corporate entity, metric, fiscal period, and unit) as **CONTRADICTED**.
+Demonstrates that FactGround identifies two conflicting factual claims of the **same epistemic status** (both asserting reported actuals for the same corporate entity, metric, fiscal period, and unit) as **CONTRADICTED**.
 
 > **Disclosure:** *Synthetic fixture used solely to demonstrate the contradiction reasoning path; it is not presented as real-world evidence.*
 
