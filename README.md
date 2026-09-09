@@ -316,7 +316,7 @@ Facts marked as `needs_review` are quarantined and can never be promoted to an a
 
 - **Starter Dataset Independence**: The implementation contains zero hardcoded company names, numbers, or starter filenames. It executes identically on arbitrary unseen business reports.
 - **Cross-Document Provenance**: Multi-document ingestion (`build_knowledge_base([pdf1, pdf2])`) preserves the distinct originating document name and SHA-256 identifier for every fact.
-- **Robust Test Coverage**: The project includes 83 unit, integration, CLI, API, real starter document, and evaluation demonstration tests.
+- **Robust Test Coverage**: The project includes 105 unit, integration, CLI, API, real starter document, and evaluation demonstration tests.
 
 ```bash
 # Run the complete test suite:
