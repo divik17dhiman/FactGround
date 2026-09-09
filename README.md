@@ -7,7 +7,7 @@
 
 ## Video Demo Link
 
-> **Video Demo:** *To be added before submission.*
+> **Video Demo:** https://youtu.be/W6qP0wAaIpU
 
 ---
 
