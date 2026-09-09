@@ -164,7 +164,7 @@ async def upload_documents(
             detail="No files provided in upload request.",
         )
 
-    # 1. Validate every upload before any processing or temporary file creation
+    # Pre-validate upload set before allocating temporary disk resources
     file_contents: list[tuple[str, bytes]] = []
     for file in files:
         filename = file.filename or ""
@@ -190,7 +190,7 @@ async def upload_documents(
             )
         file_contents.append((filename, content))
 
-    # 2. Safely create temporary files for all valid PDFs
+    # Persist uploads to temporary files for PyMuPDF ingestion
     temp_paths: list[str] = []
     temp_to_orig: dict[str, str] = {}
     try:
@@ -203,7 +203,7 @@ async def upload_documents(
             temp_to_orig[Path(temp_path).name] = filename
             temp_to_orig[temp_path] = filename
 
-        # 3. Process the complete upload set as one logical ingestion operation
+        # Ingest documents through the core pipeline
         try:
             new_kb = build_knowledge_base(temp_paths)
         except PDFIngestionError as exc:
@@ -232,7 +232,7 @@ async def upload_documents(
                 detail="Failed to process uploaded documents.",
             ) from exc
 
-        # 4. Preserve original uploaded filenames in fact provenance
+        # Restore original uploaded filenames for audit provenance
         renamed_facts = [
             replace(fact, document_name=temp_to_orig.get(fact.document_name, fact.document_name))
             if fact.document_name in temp_to_orig
@@ -242,7 +242,7 @@ async def upload_documents(
 
         _kb = _kb.add_facts(renamed_facts)
 
-        # 5. Build structured per-document response
+        # Aggregate summary per uploaded document
         processed_docs: list[dict[str, Any]] = []
         for filename, _ in file_contents:
             doc_facts = [f for f in renamed_facts if f.document_name == filename]

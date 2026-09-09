@@ -420,7 +420,7 @@ def associate_local_period(
         t_start, t_end = t["start"], t["end"]
         p_val = t["period"]
 
-        # 1. Forward attachment: value ... temporal (e.g. '$216 billion in Fiscal 2020')
+        # Forward attachment: value followed by period context (e.g. '$216 billion in Fiscal 2020')
         if t_start >= val_end:
             if crosses_other_val(val_end, t_start) or crosses_sentence_boundary(val_end, t_start):
                 continue
@@ -433,7 +433,7 @@ def associate_local_period(
                         "direction": "forward",
                     }
                 )
-        # 2. Backward attachment: temporal ... value (e.g. 'In FY2024, revenue was $120m')
+        # Backward attachment: period context preceding value (e.g. 'In FY2024, revenue was $120m')
         elif t_end <= val_start:
             if crosses_other_val(t_end, val_start) or crosses_sentence_boundary(t_end, val_start):
                 continue
@@ -951,7 +951,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
     if not text:
         return candidates
 
-    # 1. Collect all numeric value spans in the sentence
+    # Track all numeric value spans to prevent temporal context leakage across clauses
     all_val_spans: list[tuple[int, int]] = []
     for cm in CURRENCY_RE.finditer(text):
         all_val_spans.append(cm.span())
@@ -961,7 +961,7 @@ def _sentence_fact_candidates(sentence: str, page: Page, document: Document) -> 
         if _is_valid_quantity_unit(_strip_trailing_punctuation(qm.group("unit").strip())):
             all_val_spans.append(qm.span())
 
-    # 2. Extract deterministic temporal spans
+    # Extract deterministic temporal spans for local association
     temporal_spans = find_temporal_spans(text)
 
     last_end = 0

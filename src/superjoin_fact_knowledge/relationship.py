@@ -190,7 +190,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
         - INCOMPARABLE: Facts differ in dimension, unit, entity, or scope.
         - UNCERTAIN: Validation is insufficient, or period context is missing.
     """
-    # 1. Evidence Grounding Check
+    # Facts must be grounded in verified evidence before establishing authoritative relationships
     if fact_a.status != "grounded" or fact_b.status != "grounded":
         return FactRelationship(
             state=UNCERTAIN,
@@ -200,7 +200,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             explanation="One or both candidate facts are not validated as grounded.",
         )
 
-    # 2. Dimensional / Fact Type Check
+    # Dimensional compatibility gate: cannot compare disparate fact types
     if fact_a.fact_type != fact_b.fact_type:
         return FactRelationship(
             state=INCOMPARABLE,
@@ -210,7 +210,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             explanation=f"Incomparable fact types: '{fact_a.fact_type}' vs '{fact_b.fact_type}'.",
         )
 
-    # 3. Unit Compatibility Check
+    # Unit compatibility gate
     if not _units_compatible(fact_a.unit, fact_b.unit):
         return FactRelationship(
             state=INCOMPARABLE,
@@ -220,7 +220,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             explanation=f"Incompatible measurement units: '{fact_a.unit}' vs '{fact_b.unit}'.",
         )
 
-    # 4. Entity Compatibility Check
+    # Entity boundary gate: distinct named entities must not be conflated
     entity_a = _get_entity(fact_a)
     entity_b = _get_entity(fact_b)
     if entity_a and entity_b and entity_a.casefold() != entity_b.casefold():
@@ -232,7 +232,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             explanation=f"Facts refer to different entities: '{entity_a}' vs '{entity_b}'.",
         )
 
-    # 5. Scope / Context Check (Component vs Aggregate or Different Scopes)
+    # Scope boundary gate: distinct transactional components must not contradict
     scope_a = _get_scope(fact_a)
     scope_b = _get_scope(fact_b)
     if scope_a and scope_b and scope_a.casefold() != scope_b.casefold():
@@ -244,7 +244,7 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             explanation=f"The values refer to different scopes: '{scope_a}' and '{scope_b}'.",
         )
 
-    # 6. Entity / Subject Compatibility Check
+    # Subject alignment gate: metrics must refer to compatible domain concepts
     if not _subjects_compatible(fact_a.subject, fact_b.subject):
         return FactRelationship(
             state=INCOMPARABLE,
@@ -257,14 +257,14 @@ def compare_facts(fact_a: Fact, fact_b: Fact) -> FactRelationship:
             ),
         )
 
-    # 7. Temporal / Period Context Check
+    # Temporal context evaluation
     period_a = _get_period(fact_a)
     period_b = _get_period(fact_b)
     has_periods = bool(period_a and period_b)
     same_period = has_periods and _periods_match(period_a, period_b)
     different_period = has_periods and not same_period
 
-    # 8. Value Comparison
+    # Numerical value comparison and relationship classification
     val_a = fact_a.normalized_value
     val_b = fact_b.normalized_value
 

@@ -26,7 +26,9 @@ from superjoin_fact_knowledge.workflow import build_knowledge_base, query
 
 
 def create_demo_pdf(path: Path, text: str) -> Path:
-    """Generate a clean single-page demonstration fixture PDF."""
+    """Generate a clean single-page demonstration fixture PDF if not already present."""
+    if path.exists():
+        return path
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = fitz.open()
     page = doc.new_page()
@@ -37,7 +39,9 @@ def create_demo_pdf(path: Path, text: str) -> Path:
 
 
 def create_scanned_image_pdf(path: Path) -> Path:
-    """Generate a synthetic scanned image PDF with an embedded image and no extractable text."""
+    """Generate a synthetic scanned image PDF with an embedded image if not already present."""
+    if path.exists():
+        return path
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = fitz.open()
     page = doc.new_page()
